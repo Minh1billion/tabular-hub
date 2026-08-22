@@ -1,0 +1,40 @@
+# Environments
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+
+# Package managers
+.uv/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+test.db
+*.db
+*.sqlite3
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Alembic runtime artifacts (keep versions checked in)
+alembic/versions/__pycache__/

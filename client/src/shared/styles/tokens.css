@@ -1,0 +1,15 @@
+:root {
+  --cream: #f5f5ef;
+  --cream-soft: #efefe6;
+  --white: #ffffff;
+  --line: #e2e5e0;
+  --ink: #16231c;
+  --slate: #4b534c;
+  --muted: #8b9089;
+  --brand-deep: #123d2c;
+  --brand: #17a672;
+  --brand-hover: #0f8a5f;
+  --brand-tint: #e4f3ec;
+  --warn: #c2540e;
+  --warn-tint: #fbebe0;
+}

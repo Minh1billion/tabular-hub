@@ -1,0 +1,37 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <g stroke="#D8DCD3" stroke-width="1.2" fill="none">
+    <line x1="120" y1="120" x2="120" y2="230"/>
+    <line x1="120" y1="230" x2="220" y2="170"/>
+    <line x1="220" y1="170" x2="220" y2="90"/>
+    <line x1="940" y1="600" x2="940" y2="700"/>
+    <line x1="940" y1="700" x2="1040" y2="640"/>
+    <line x1="1040" y1="640" x2="1120" y2="700"/>
+    <line x1="1120" y1="700" x2="1120" y2="620"/>
+    <line x1="90" y1="600" x2="90" y2="700"/>
+    <line x1="90" y1="700" x2="180" y2="650"/>
+    <line x1="1000" y1="90" x2="1080" y2="150"/>
+    <line x1="1080" y1="150" x2="1080" y2="230"/>
+  </g>
+  <g fill="#B9C3B4">
+    <circle cx="120" cy="120" r="4"/>
+    <circle cx="120" cy="230" r="4"/>
+    <circle cx="220" cy="170" r="5"/>
+    <circle cx="220" cy="90" r="4"/>
+    <circle cx="940" cy="600" r="4"/>
+    <circle cx="940" cy="700" r="4"/>
+    <circle cx="1040" cy="640" r="5"/>
+    <circle cx="1120" cy="700" r="4"/>
+    <circle cx="1120" cy="620" r="4"/>
+    <circle cx="90" cy="600" r="4"/>
+    <circle cx="90" cy="700" r="4"/>
+    <circle cx="180" cy="650" r="4"/>
+    <circle cx="1000" cy="90" r="4"/>
+    <circle cx="1080" cy="150" r="5"/>
+    <circle cx="1080" cy="230" r="4"/>
+  </g>
+  <g fill="#17A672" opacity="0.55">
+    <circle cx="220" cy="170" r="2.5"/>
+    <circle cx="1040" cy="640" r="2.5"/>
+    <circle cx="1080" cy="150" r="2.5"/>
+  </g>
+</svg>
