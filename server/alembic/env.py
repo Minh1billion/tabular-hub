@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.auth import models as auth_models
 from app.config import settings
 from app.database import Base
+from app.node import models as node_models
 from app.workspace import models as workspace_models
 
 config = context.config
