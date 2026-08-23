@@ -7,7 +7,7 @@ from app.auth.models import User
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.workspace import service
-from app.workspace.schemas import WorkspaceCreate, WorkspaceRead
+from app.workspace.schemas import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -25,6 +25,29 @@ def list_all(
     current_user: User = Depends(get_current_user),
 ):
     return service.list_workspaces(db, owner_id=current_user.id)
+
+@router.get("/{workspace_id}", response_model=WorkspaceRead)
+def get(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_workspace(db, owner_id=current_user.id, workspace_id=workspace_id)
+
+@router.patch("/{workspace_id}", response_model=WorkspaceRead)
+def update(
+    workspace_id: uuid.UUID,
+    payload: WorkspaceUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.update_workspace(
+        db,
+        owner_id=current_user.id,
+        workspace_id=workspace_id,
+        name=payload.name,
+        spec=payload.spec,
+    )
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete(

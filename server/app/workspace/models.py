@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -9,6 +9,7 @@ class Workspace(Base, UUIDPKMixin, TimestampMixin):
 
     name = Column(String, nullable=False)
     owner_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    spec = Column(JSON, nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     owner = relationship("User", back_populates="workspaces")
