@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import '@xyflow/react/dist/style.css';
 
 @tailwind base;
 @tailwind components;
@@ -21,4 +22,24 @@ body {
 
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+.react-flow {
+  --xy-background-color: var(--cream);
+  --xy-background-pattern-color: var(--line);
+  --xy-edge-stroke: var(--line);
+  --xy-edge-stroke-selected: var(--brand);
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: var(--brand);
+  --xy-connectionline-stroke-width: 1.5;
+  --xy-handle-background-color: var(--white);
+  --xy-handle-border-color: var(--muted);
+  --xy-minimap-background-color: var(--white);
+  --xy-minimap-mask-background-color: rgba(22, 35, 28, 0.06);
+  --xy-minimap-node-background-color: var(--cream-soft);
+  --xy-controls-button-background-color: var(--white);
+  --xy-controls-button-background-color-hover: var(--cream-soft);
+  --xy-controls-button-border-color: var(--line);
+  --xy-controls-button-color: var(--slate);
+  --xy-controls-button-color-hover: var(--ink);
 }

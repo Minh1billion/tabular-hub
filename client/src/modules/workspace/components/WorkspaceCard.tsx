@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/shared/components/ui/Card'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Avatar } from '@/shared/components/ui/Avatar'
@@ -20,8 +21,10 @@ function formatDate(iso: string) {
 }
 
 export function WorkspaceCard({ workspace, ownerName, isPersonal, onDelete, isDeleting }: WorkspaceCardProps) {
+  const navigate = useNavigate()
+
   return (
-    <Card>
+    <Card className="cursor-pointer" onClick={() => navigate(`/workspaces/${workspace.id}`)}>
       <div className="flex items-start justify-between mb-3.5">
         <div className="w-[34px] h-[34px] rounded-[9px] bg-brand-tint flex items-center justify-center">
           <svg className="w-4 h-4 text-[#0f6e4c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -39,7 +42,10 @@ export function WorkspaceCard({ workspace, ownerName, isPersonal, onDelete, isDe
         <Avatar name={ownerName} size={20} />
         <button
           type="button"
-          onClick={() => onDelete(workspace.id)}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete(workspace.id)
+          }}
           disabled={isDeleting}
           className="text-xs text-muted hover:text-warn transition-colors disabled:opacity-50"
         >

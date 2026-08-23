@@ -14,7 +14,7 @@ dependencies = [
     "itsdangerous",
     "httpx",
     "python-jose[cryptography]",
-    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@6685d9eaf0450073cb9e20b9c546d7bcf4785dce",
+    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@e96d1323a7f9dc1d54bdc173b768b08fea8043df",
 ]
 
 [dependency-groups]
