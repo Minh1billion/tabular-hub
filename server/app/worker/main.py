@@ -1,6 +1,8 @@
 import os
 import socket
 
+import redis
+
 from app.core.engine import engine_lifecycle
 from app.core.queue import ack, claim_idle_tasks, ensure_group, read_tasks
 from app.worker.processor import process_task
@@ -13,9 +15,13 @@ def run() -> None:
     consumer = f"{socket.gethostname()}-{os.getpid()}"
     try:
         while True:
-            messages = claim_idle_tasks(consumer, IDLE_RECLAIM_MS)
-            if not messages:
-                messages = read_tasks(consumer)
+            try:
+                messages = claim_idle_tasks(consumer, IDLE_RECLAIM_MS)
+                if not messages:
+                    messages = read_tasks(consumer)
+            except (redis.exceptions.TimeoutError, redis.exceptions.ConnectionError):
+                continue
+
             for message_id, fields in messages:
                 try:
                     ok = process_task(engine_lifecycle, fields["run_id"])

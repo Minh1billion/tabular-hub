@@ -5,7 +5,14 @@ import redis.asyncio as aioredis
 
 from app.config import settings
 
-_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+_client = redis.from_url(
+    settings.REDIS_URL,
+    decode_responses=True,
+    socket_timeout=10,
+    socket_connect_timeout=5,
+    retry_on_timeout=True,
+    health_check_interval=30,
+)
 _async_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
 GROUP = "workers"
