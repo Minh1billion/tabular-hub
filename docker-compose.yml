@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   server:
     build: ./server
     restart: unless-stopped
@@ -24,8 +37,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+
+  worker:
+    build: ./server
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker.main"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   client:
     build: ./client
@@ -44,3 +71,4 @@ services:
 
 volumes:
   db_data:
+  redis_data:

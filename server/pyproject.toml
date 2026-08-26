@@ -14,17 +14,21 @@ dependencies = [
     "itsdangerous",
     "httpx",
     "python-jose[cryptography]",
-    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@bc115387d69136c13855ee4280d9492dac481921",
+    "redis",
+    "python-multipart",
+    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@d49696292480d212773b26a39d863a6196694488",
 ]
 
 [dependency-groups]
 dev = [
     "pytest",
     "pytest-asyncio",
+    "fakeredis",
 ]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["hatchling"]

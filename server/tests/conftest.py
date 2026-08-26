@@ -10,15 +10,22 @@ os.environ.setdefault("GITHUB_CLIENT_SECRET", "test")
 os.environ.setdefault("OAUTH_REDIRECT_BASE_URL", "http://testserver")
 os.environ.setdefault("FRONTEND_URL", "http://testserver")
 
+import fakeredis
+from fakeredis import aioredis as fakeaioredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import app.core.queue as queue_module
 from app.auth.models import User
 from app.core.security import create_access_token
 from app.database import Base, get_db
 from app.main import app
+
+_fake_redis_server = fakeredis.FakeServer()
+queue_module._client = fakeredis.FakeRedis(server=_fake_redis_server, decode_responses=True)
+queue_module._async_client = fakeaioredis.FakeRedis(server=_fake_redis_server, decode_responses=True)
 
 engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

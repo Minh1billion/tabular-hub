@@ -18,4 +18,18 @@ class Settings(BaseSettings):
     FRONTEND_URL: str
     COOKIE_SECURE: bool = False
 
+    ENGINE_BACKEND: str = "local"
+    ENGINE_STORAGE_ROOT: str = ".tm"
+    ENGINE_S3_BUCKET_NAME: str | None = None
+    ENGINE_S3_ROOT_PREFIX: str = ""
+    ENGINE_S3_REGION: str = "us-east-1"
+    ENGINE_S3_ENDPOINT_URL: str | None = None
+    ENGINE_S3_ACCESS_KEY_ID: str | None = None
+    ENGINE_S3_SECRET_ACCESS_KEY: str | None = None
+    ENGINE_MAX_CACHED_GRAPHS: int = 128
+    ENGINE_BUCKET_IDLE_TTL_SECONDS: int | None = None
+
+    REDIS_URL: str = "redis://localhost:6379/0"
+    RUN_QUEUE_STREAM: str = "runs:pending"
+
 settings = Settings()
