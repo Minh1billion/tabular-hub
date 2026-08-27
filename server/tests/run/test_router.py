@@ -126,6 +126,56 @@ def test_validate_unknown_node_type(auth_client, workspace):
     assert response.status_code == 200
     assert response.json()["valid"] is False
 
+def test_cancel_queued_run(auth_client, workspace):
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "cancel-queued-1"},
+    )
+    run_id = created.json()["id"]
+
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/{run_id}/cancel")
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    assert response.json()["cancelled_at"] is not None
+
+def test_cancel_running_run_sets_cancelling_and_flag(auth_client, workspace, db_session):
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "cancel-running-1"},
+    )
+    run_id = created.json()["id"]
+
+    from app.run.models import Run
+
+    db_session.query(Run).filter(Run.id == run_id).update({"status": "running"})
+    db_session.commit()
+
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/{run_id}/cancel")
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelling"
+    assert queue_module.is_cancel_requested(run_id) is True
+
+def test_cancel_terminal_run_conflicts(auth_client, workspace, db_session):
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "cancel-terminal-1"},
+    )
+    run_id = created.json()["id"]
+
+    from app.run.models import Run
+
+    db_session.query(Run).filter(Run.id == run_id).update({"status": "completed"})
+    db_session.commit()
+
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/{run_id}/cancel")
+    assert response.status_code == 409
+
+def test_cancel_nonexistent_run(auth_client, workspace):
+    response = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs/00000000-0000-0000-0000-000000000000/cancel"
+    )
+    assert response.status_code == 404
+
 def test_event_history_returns_persisted_events(auth_client, workspace):
     from app.database import SessionLocal
     from app.run.models import RunEvent

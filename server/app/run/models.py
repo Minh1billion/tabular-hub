@@ -19,6 +19,7 @@ class Run(Base, UUIDPKMixin, TimestampMixin):
     execution_id = Column(String, nullable=True)
     idempotency_key = Column(String, nullable=False)
     attempt = Column(Integer, nullable=False, default=1)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

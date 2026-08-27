@@ -17,6 +17,9 @@ class UnauthorizedError(AppError):
 class ForbiddenError(AppError):
     status_code = 403
 
+class ConflictError(AppError):
+    status_code = 409
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError):

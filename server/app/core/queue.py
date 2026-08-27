@@ -41,6 +41,15 @@ def ack(message_id: str) -> None:
 def publish_event(run_id: str, event: dict) -> None:
     _client.publish(f"run:{run_id}", json.dumps(event))
 
+def request_cancel(run_id: str) -> None:
+    _client.set(f"cancel:{run_id}", "1", ex=3600)
+
+def is_cancel_requested(run_id: str) -> bool:
+    return _client.exists(f"cancel:{run_id}") == 1
+
+def clear_cancel(run_id: str) -> None:
+    _client.delete(f"cancel:{run_id}")
+
 async def subscribe_run_events(run_id: str):
     pubsub = _async_client.pubsub()
     await pubsub.subscribe(f"run:{run_id}")

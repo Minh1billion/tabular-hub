@@ -16,6 +16,7 @@ class RunRead(BaseModel):
     status: str
     execution_id: str | None
     attempt: int
+    cancelled_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

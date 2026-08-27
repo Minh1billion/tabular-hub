@@ -9,7 +9,7 @@ from tabular_manner.engine.bootstrap import Engine
 
 from app.core.engine import get_engine
 from app.core.exceptions import NotFoundError
-from app.core.queue import enqueue_run, subscribe_run_events
+from app.core.queue import enqueue_run, request_cancel, subscribe_run_events
 from app.database import get_db
 from app.dependencies import get_owned_workspace
 from app.run import service
@@ -62,6 +62,21 @@ def get(
         raise NotFoundError("Run not found")
     return run
 
+@router.post("/{run_id}/cancel", response_model=RunRead)
+def cancel(
+    run_id: uuid.UUID,
+    workspace: Workspace = Depends(get_owned_workspace),
+    db: Session = Depends(get_db),
+):
+    run = service.get_run(db, workspace_id=workspace.id, run_id=run_id)
+    if run is None:
+        raise NotFoundError("Run not found")
+
+    run = service.request_cancel_run(db, run=run)
+    if run.status == "cancelling":
+        request_cancel(str(run.id))
+    return run
+
 @router.get("/{run_id}/events/history", response_model=list[RunEventRead])
 def event_history(
     run_id: uuid.UUID,
@@ -96,7 +111,7 @@ async def stream_events(
                     continue
                 yield f"data: {message['data']}\n\n"
                 event_name = json.loads(message["data"]).get("event")
-                if event_name in ("completed", "failed"):
+                if event_name in ("completed", "failed", "cancelled"):
                     break
         finally:
             await pubsub.unsubscribe(f"run:{run_id}")
