@@ -35,11 +35,28 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T
 }
 
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new ApiError(response.status, data?.detail ?? 'Something went wrong')
+  }
+
+  return data as T
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, formData: FormData) => uploadRequest<T>(path, formData),
 }
 
 export function oauthLoginUrl(provider: 'google' | 'github') {

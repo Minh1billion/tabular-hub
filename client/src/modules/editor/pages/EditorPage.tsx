@@ -56,6 +56,9 @@ export function EditorPage() {
         <span className="text-muted">/</span>
         <span className="text-sm font-medium text-ink truncate">{workspace?.name}</span>
         <div className="flex-1" />
+        <Link to={`/workspaces/${workspaceId}/resources`} className="text-sm text-muted hover:text-ink transition-colors">
+          Resources
+        </Link>
         <span className="font-mono text-[11px] text-muted">
           {updateWorkspace.isPending ? 'Saving…' : 'Saved'}
         </span>

@@ -1,7 +1,7 @@
 import { HTMLAttributes } from 'react'
 import { cn } from '@/shared/lib/cn'
 
-type BadgeTone = 'team' | 'personal'
+type BadgeTone = 'team' | 'personal' | 'success' | 'error' | 'pending'
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone
@@ -10,6 +10,9 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 const toneClasses: Record<BadgeTone, string> = {
   team: 'bg-brand-tint text-[#0f6e4c]',
   personal: 'bg-cream-soft text-slate',
+  success: 'bg-brand-tint text-[#0f6e4c]',
+  error: 'bg-warn-tint text-warn',
+  pending: 'bg-cream-soft text-muted',
 }
 
 export function Badge({ className, tone = 'team', ...props }: BadgeProps) {
