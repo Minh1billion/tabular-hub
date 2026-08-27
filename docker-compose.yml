@@ -41,6 +41,8 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    volumes:
+      - tm_storage:/code/.tm
 
   worker:
     build: ./server
@@ -53,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - tm_storage:/code/.tm
 
   client:
     build: ./client
@@ -72,3 +76,4 @@ services:
 volumes:
   db_data:
   redis_data:
+  tm_storage:

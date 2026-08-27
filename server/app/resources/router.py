@@ -26,7 +26,9 @@ def _drain(events) -> dict:
     return result
 
 async def _write_upload_to_tmp(file: UploadFile, suffix: str) -> str:
-    fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+    upload_dir = os.path.join(settings.ENGINE_STORAGE_ROOT, "_uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(suffix=suffix, dir=upload_dir)
     written = 0
     with os.fdopen(fd, "wb") as tmp:
         while chunk := await file.read(settings.UPLOAD_CHUNK_SIZE_BYTES):

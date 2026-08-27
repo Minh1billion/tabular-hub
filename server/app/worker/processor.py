@@ -59,7 +59,7 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str) -> bool:
 
         clear_cancel(run_id)
         engine_lifecycle.touch_bucket(str(run.workspace_id))
-        if run.kind == "import":
+        if run.kind == "import" and os.path.exists(run.spec["path"]):
             os.remove(run.spec["path"])
         return True
     finally:
