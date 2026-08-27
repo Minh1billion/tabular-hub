@@ -1,16 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import logo from '@/assets/logo.svg'
 import { Avatar } from '@/shared/components/ui/Avatar'
 import { useCurrentUser, useLogout } from '@/modules/auth/hooks'
+import { useWorkspaces } from '@/modules/workspace/hooks'
+import { cn } from '@/shared/lib/cn'
 
 export function AppHeader() {
   const { data: user } = useCurrentUser()
+  const { data: workspaces = [] } = useWorkspaces()
   const logout = useLogout()
   const navigate = useNavigate()
+  const { id: activeWorkspaceId } = useParams<{ id: string }>()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
 
   const displayName = user?.display_name ?? user?.email ?? ''
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId)
 
   function handleLogout() {
     logout.mutate(undefined, {
@@ -29,7 +35,52 @@ export function AppHeader() {
           <span className="w-[3px] h-[3px] rounded-full bg-muted" />
           <span className="w-2.5 h-px bg-line" />
         </span>
-        <span className="text-ink font-semibold">Workspaces</span>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setWorkspaceMenuOpen((open) => !open)}
+            className="flex items-center gap-1 text-ink font-semibold"
+          >
+            {activeWorkspace?.name ?? 'Workspaces'}
+            <svg className="w-3 h-3 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+
+          {workspaceMenuOpen && (
+            <div className="absolute left-0 top-8 w-56 bg-white border border-line rounded-lg py-1.5 z-20 max-h-72 overflow-auto">
+              {workspaces.map((workspace) => (
+                <button
+                  key={workspace.id}
+                  type="button"
+                  onClick={() => {
+                    navigate(`/workspaces/${workspace.id}`)
+                    setWorkspaceMenuOpen(false)
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-1.5 text-sm hover:bg-cream-soft transition-colors truncate',
+                    workspace.id === activeWorkspaceId ? 'text-brand font-medium' : 'text-ink',
+                  )}
+                >
+                  {workspace.name}
+                </button>
+              ))}
+              <div className="border-t border-line my-1.5" />
+              <button
+                type="button"
+                onClick={() => {
+                  navigate('/workspaces')
+                  setWorkspaceMenuOpen(false)
+                }}
+                className="w-full text-left px-3 py-1.5 text-sm text-muted hover:bg-cream-soft transition-colors"
+              >
+                All workspaces
+              </button>
+            </div>
+          )}
+        </div>
+
         <span className="font-mono text-[10.5px] px-2 py-0.5 rounded-full bg-brand-tint text-[#0f6e4c] tracking-wide">
           Free
         </span>

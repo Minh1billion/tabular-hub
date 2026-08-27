@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
 import { useNodeLibrary } from '@/modules/nodes/hooks'
+import { resourcesQueryKey, useResources } from '@/modules/resources/hooks'
+import { ResourceListPanel } from '@/modules/resources/components/ResourceListPanel'
+import { ResourcePreviewPanel } from '@/modules/resources/components/ResourcePreviewPanel'
+import { ImportResourceDialog } from '@/modules/resources/components/ImportResourceDialog'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
 import { NodePalette } from '../components/NodePalette'
@@ -10,6 +15,37 @@ import { BottomPanel } from '../components/BottomPanel'
 
 function emptySpec(name: string): GraphSpec {
   return { name, nodes: [], connections: [] }
+}
+
+function ResourcesTab({ workspaceId }: { workspaceId: string }) {
+  const queryClient = useQueryClient()
+  const { data: resources, isLoading } = useResources(workspaceId)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+
+  return (
+    <div className="h-full flex">
+      <ResourceListPanel
+        keys={resources?.keys ?? []}
+        activeKey={activeKey}
+        onSelect={setActiveKey}
+        onImportClick={() => setIsImporting(true)}
+        isLoading={isLoading}
+      />
+      <ResourcePreviewPanel workspaceId={workspaceId} activeKey={activeKey} onDeleted={() => setActiveKey(null)} />
+
+      {isImporting && (
+        <ImportResourceDialog
+          workspaceId={workspaceId}
+          onClose={() => setIsImporting(false)}
+          onImported={() => {
+            queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
+            setIsImporting(false)
+          }}
+        />
+      )}
+    </div>
+  )
 }
 
 export function EditorPage() {
@@ -56,9 +92,6 @@ export function EditorPage() {
         <span className="text-muted">/</span>
         <span className="text-sm font-medium text-ink truncate">{workspace?.name}</span>
         <div className="flex-1" />
-        <Link to={`/workspaces/${workspaceId}/resources`} className="text-sm text-muted hover:text-ink transition-colors">
-          Resources
-        </Link>
         <span className="font-mono text-[11px] text-muted">
           {updateWorkspace.isPending ? 'Saving…' : 'Saved'}
         </span>
@@ -79,6 +112,11 @@ export function EditorPage() {
                 {JSON.stringify(spec, null, 2)}
               </pre>
             ),
+          },
+          {
+            id: 'resources',
+            label: 'Resources',
+            content: <ResourcesTab workspaceId={workspaceId} />,
           },
         ]}
       />

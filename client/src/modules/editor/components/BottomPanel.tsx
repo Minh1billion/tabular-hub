@@ -56,7 +56,7 @@ export function BottomPanel({ tabs, defaultOpen = false }: BottomPanelProps) {
         </button>
       </div>
 
-      {isOpen && activeTab && <div className="h-56 border-t border-line overflow-auto">{activeTab.content}</div>}
+      {isOpen && activeTab && <div className="h-96 border-t border-line overflow-auto">{activeTab.content}</div>}
     </div>
   )
 }
