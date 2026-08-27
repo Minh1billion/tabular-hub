@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.core.engine import EngineLifecycle
-from app.core.queue import publish_event
+from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.run.models import Run, RunEvent
 
@@ -21,7 +21,9 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str) -> bool:
         bucket = str(run.workspace_id)
         seq = 0
 
-        for event in engine_lifecycle.engine.execution.execute(spec=run.spec, bucket=bucket):
+        for event in engine_lifecycle.engine.execution.execute(
+            spec=run.spec, bucket=bucket, cancel_check=lambda: is_cancel_requested(run_id)
+        ):
             db.add(
                 RunEvent(
                     run_id=run.id,
@@ -39,10 +41,11 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str) -> bool:
             if event["event"] == "compiled":
                 run.execution_id = event["data"]["execution_id"]
                 db.commit()
-            elif event["event"] in ("completed", "failed"):
+            elif event["event"] in ("completed", "failed", "cancelled"):
                 run.status = event["event"]
                 db.commit()
 
+        clear_cancel(run_id)
         engine_lifecycle.touch_bucket(bucket)
         return True
     finally:
