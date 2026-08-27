@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
+import { useNodeLibrary } from '@/modules/nodes/hooks'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
+import { NodePalette } from '../components/NodePalette'
 
 function emptySpec(name: string): GraphSpec {
   return { name, nodes: [], connections: [] }
@@ -14,6 +16,7 @@ export function EditorPage() {
   const workspaceId = id ?? ''
   const { data: workspace, isLoading } = useWorkspace(workspaceId)
   const updateWorkspace = useUpdateWorkspace(workspaceId)
+  const { data: nodeLibrary } = useNodeLibrary(workspaceId)
 
   const [spec, setSpec] = useState<GraphSpec | null>(null)
   const hydratedForRef = useRef<string | null>(null)
@@ -57,8 +60,9 @@ export function EditorPage() {
         </span>
       </div>
 
-      <div className="flex-1 min-h-0">
-        <Canvas spec={spec} onSpecChange={setSpec} />
+      <div className="flex-1 min-h-0 flex">
+        <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
+        <Canvas spec={spec} onSpecChange={setSpec} nodeLibrary={nodeLibrary} />
       </div>
     </div>
   )
