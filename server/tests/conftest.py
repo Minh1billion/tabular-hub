@@ -36,6 +36,11 @@ def setup_db():
     yield
     Base.metadata.drop_all(bind=engine)
 
+@pytest.fixture(autouse=True)
+def _flush_redis():
+    yield
+    queue_module._client.flushall()
+
 @pytest.fixture
 def db_session():
     session = TestingSessionLocal()

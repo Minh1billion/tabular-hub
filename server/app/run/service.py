@@ -9,8 +9,8 @@ from app.core.exceptions import ConflictError
 from app.run.models import Run, RunEvent
 from app.workspace.models import Workspace
 
-def create_run(db: Session, *, workspace: Workspace, spec: dict[str, Any], idempotency_key: str) -> Run:
-    run = Run(workspace_id=workspace.id, spec=spec, status="queued", idempotency_key=idempotency_key)
+def create_run(db: Session, *, workspace: Workspace, spec: dict[str, Any], idempotency_key: str, kind: str = "pipeline") -> Run:
+    run = Run(workspace_id=workspace.id, kind=kind, spec=spec, status="queued", idempotency_key=idempotency_key)
     db.add(run)
     try:
         db.commit()

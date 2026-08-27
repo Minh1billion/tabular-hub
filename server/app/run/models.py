@@ -6,7 +6,6 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 from app.shared.models import GUID, TimestampMixin, UUIDPKMixin
 
-
 class Run(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "runs"
     __table_args__ = (
@@ -14,6 +13,7 @@ class Run(Base, UUIDPKMixin, TimestampMixin):
     )
 
     workspace_id = Column(GUID(), ForeignKey("workspaces.id"), nullable=False)
+    kind = Column(String, nullable=False, default="pipeline")
     spec = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="queued")
     execution_id = Column(String, nullable=True)

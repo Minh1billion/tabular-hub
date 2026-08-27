@@ -13,6 +13,7 @@ class RunRead(BaseModel):
 
     id: uuid.UUID
     workspace_id: uuid.UUID
+    kind: str
     status: str
     execution_id: str | None
     attempt: int
