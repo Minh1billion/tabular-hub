@@ -32,4 +32,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     RUN_QUEUE_STREAM: str = "runs:pending"
 
+    MAX_UPLOAD_SIZE_BYTES: int = 5 * 1024 * 1024 * 1024
+    UPLOAD_CHUNK_SIZE_BYTES: int = 1024 * 1024
+
 settings = Settings()
