@@ -15,10 +15,15 @@ import {
   useNodesState,
 } from '@xyflow/react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
+import { ContextMenu } from '@/shared/components/ui/ContextMenu'
 import { GraphConnection, GraphNode, GraphSpec } from '../types'
 import { PipelineNode, PipelineNodeData } from './PipelineNode'
 import { NodeInspector } from './NodeInspector'
 import { NODE_DRAG_MIME } from './NodePalette'
+
+type CanvasContextMenu =
+  | { type: 'node'; id: string; x: number; y: number }
+  | { type: 'edge'; id: string; x: number; y: number }
 
 const nodeTypes: NodeTypes = { pipeline: PipelineNode }
 
@@ -89,6 +94,7 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(spec.nodes, descriptors))
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections))
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -154,6 +160,42 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
     event.dataTransfer.dropEffect = 'move'
   }, [])
 
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
+    event.preventDefault()
+    setContextMenu(null)
+  }, [])
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault()
+    setContextMenu({ type: 'node', id: node.id, x: event.clientX, y: event.clientY })
+  }, [])
+
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault()
+    setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY })
+  }, [])
+
+  const deleteNode = useCallback(
+    (id: string) => {
+      setNodes((current) => current.filter((node) => node.id !== id))
+      setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id))
+      setSelectedNodeId((current) => (current === id ? null : current))
+    },
+    [setNodes, setEdges],
+  )
+
+  const deleteEdge = useCallback(
+    (id: string) => {
+      setEdges((current) => current.filter((edge) => edge.id !== id))
+    },
+    [setEdges],
+  )
+
+  const closeInspector = useCallback(() => {
+    setNodes((current) => current.map((node) => (node.selected ? { ...node, selected: false } : node)))
+    setSelectedNodeId(null)
+  }, [setNodes])
+
   useEffect(() => {
     onSpecChange(toGraphSpec(spec.name, nodes, edges))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,7 +213,13 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
 
   return (
     <div className="w-full h-full flex">
-      <div ref={wrapperRef} className="relative flex-1 h-full" onDrop={onDrop} onDragOver={onDragOver}>
+      <div
+        ref={wrapperRef}
+        className="relative flex-1 h-full"
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onContextMenu={(event) => event.preventDefault()}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -182,6 +230,9 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
             reactFlowInstance.current = instance
           }}
           onSelectionChange={({ nodes: selected }) => setSelectedNodeId(selected[0]?.id ?? null)}
+          onNodeContextMenu={onNodeContextMenu}
+          onEdgeContextMenu={onEdgeContextMenu}
+          onPaneContextMenu={onPaneContextMenu}
           nodeTypes={nodeTypes}
           fitView
           proOptions={{ hideAttribution: true }}
@@ -202,7 +253,25 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
           node={selectedGraphNode}
           descriptor={descriptors.get(selectedGraphNode.type)}
           onChange={updateSelectedParams}
-          onClose={() => setSelectedNodeId(null)}
+          onClose={closeInspector}
+        />
+      )}
+
+      {contextMenu?.type === 'node' && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[{ label: 'Delete node', destructive: true, onClick: () => deleteNode(contextMenu.id) }]}
+        />
+      )}
+
+      {contextMenu?.type === 'edge' && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[{ label: 'Delete connection', destructive: true, onClick: () => deleteEdge(contextMenu.id) }]}
         />
       )}
     </div>

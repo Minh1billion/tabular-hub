@@ -6,6 +6,7 @@ import { useNodeLibrary } from '@/modules/nodes/hooks'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
 import { NodePalette } from '../components/NodePalette'
+import { BottomPanel } from '../components/BottomPanel'
 
 function emptySpec(name: string): GraphSpec {
   return { name, nodes: [], connections: [] }
@@ -64,6 +65,20 @@ export function EditorPage() {
         <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         <Canvas spec={spec} onSpecChange={setSpec} nodeLibrary={nodeLibrary} />
       </div>
+
+      <BottomPanel
+        tabs={[
+          {
+            id: 'spec',
+            label: 'Spec',
+            content: (
+              <pre className="p-3 font-mono text-[12px] leading-relaxed text-ink whitespace-pre-wrap break-all">
+                {JSON.stringify(spec, null, 2)}
+              </pre>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

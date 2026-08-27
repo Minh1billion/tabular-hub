@@ -1,9 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
 import { useUnregisterNode } from '@/modules/nodes/hooks'
+import { Input } from '@/shared/components/ui/Input'
 import { RegisterNodeDialog } from './RegisterNodeDialog'
 
 export const NODE_DRAG_MIME = 'application/tabular-node-type'
+
+const CATEGORY_ORDER = ['IO', 'Transform', 'Merge']
+
+function categoryOf(descriptor: NodeDescriptor): string {
+  if (descriptor.fan_in) return 'Merge'
+  if (descriptor.type.startsWith('fetch_') || descriptor.type.startsWith('push_')) return 'IO'
+  return 'Transform'
+}
+
+function groupByCategory(descriptors: NodeDescriptor[]) {
+  const groups = new Map<string, NodeDescriptor[]>()
+  for (const descriptor of descriptors) {
+    const label = categoryOf(descriptor)
+    const list = groups.get(label) ?? []
+    list.push(descriptor)
+    groups.set(label, list)
+  }
+  return CATEGORY_ORDER.filter((label) => groups.has(label)).map((label) => [label, groups.get(label)!] as const)
+}
 
 interface NodePaletteProps {
   workspaceId: string
@@ -67,18 +87,41 @@ function CustomNodeItem({
 
 export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
   const [isRegistering, setIsRegistering] = useState(false)
+  const [search, setSearch] = useState('')
   const unregisterNode = useUnregisterNode(workspaceId)
+
+  const query = search.trim().toLowerCase()
+  const filteredBuiltin = useMemo(
+    () => nodeLibrary?.builtin.filter((descriptor) => descriptor.type.includes(query)) ?? [],
+    [nodeLibrary, query],
+  )
+  const filteredCustom = useMemo(
+    () => nodeLibrary?.custom.filter((descriptor) => descriptor.type.includes(query)) ?? [],
+    [nodeLibrary, query],
+  )
+  const groupedBuiltin = useMemo(() => groupByCategory(filteredBuiltin), [filteredBuiltin])
 
   return (
     <div className="w-[240px] bg-white border-r border-line flex flex-col p-4 overflow-auto">
       <h2 className="font-headline font-semibold text-sm mb-3">Node library</h2>
 
-      <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">Builtin</div>
-      <div className="flex flex-col gap-1.5 mb-5">
-        {nodeLibrary?.builtin.map((descriptor) => (
-          <NodeItem key={descriptor.type} descriptor={descriptor} />
-        ))}
-      </div>
+      <Input
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search nodes…"
+        className="mb-4"
+      />
+
+      {groupedBuiltin.map(([label, descriptors]) => (
+        <div key={label} className="mb-5">
+          <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
+          <div className="flex flex-col gap-1.5">
+            {descriptors.map((descriptor) => (
+              <NodeItem key={descriptor.type} descriptor={descriptor} />
+            ))}
+          </div>
+        </div>
+      ))}
 
       <div className="flex items-center justify-between mb-2">
         <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
@@ -90,7 +133,7 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        {nodeLibrary?.custom.map((descriptor) => (
+        {filteredCustom.map((descriptor) => (
           <CustomNodeItem
             key={descriptor.type}
             descriptor={descriptor}
