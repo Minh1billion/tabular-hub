@@ -10,12 +10,19 @@ interface BottomPanelTab {
 interface BottomPanelProps {
   tabs: BottomPanelTab[]
   defaultOpen?: boolean
+  activeTabId?: string
+  onActiveTabChange?: (tabId: string) => void
 }
 
-export function BottomPanel({ tabs, defaultOpen = false }: BottomPanelProps) {
+export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlledTabId, onActiveTabChange }: BottomPanelProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  const [activeTabId, setActiveTabId] = useState(tabs[0]?.id)
-  const activeTab = tabs.find((tab) => tab.id === activeTabId)
+  const [internalTabId, setInternalTabId] = useState(tabs[0]?.id)
+  const activeTabId = controlledTabId ?? internalTabId
+
+  function selectTab(tabId: string) {
+    setInternalTabId(tabId)
+    onActiveTabChange?.(tabId)
+  }
 
   return (
     <div className="shrink-0 bg-white border-t border-line flex flex-col">
@@ -25,7 +32,7 @@ export function BottomPanel({ tabs, defaultOpen = false }: BottomPanelProps) {
             key={tab.id}
             type="button"
             onClick={() => {
-              setActiveTabId(tab.id)
+              selectTab(tab.id)
               setIsOpen(true)
             }}
             className={cn(
@@ -56,7 +63,15 @@ export function BottomPanel({ tabs, defaultOpen = false }: BottomPanelProps) {
         </button>
       </div>
 
-      {isOpen && activeTab && <div className="h-96 border-t border-line overflow-auto">{activeTab.content}</div>}
+      {isOpen && (
+        <div className="h-96 border-t border-line overflow-auto">
+          {tabs.map((tab) => (
+            <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
+              {tab.content}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

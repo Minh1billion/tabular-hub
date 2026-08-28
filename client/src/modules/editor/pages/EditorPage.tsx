@@ -65,6 +65,7 @@ export function EditorPage() {
   const validateSpec = useValidateSpec(workspaceId)
   const createRun = useCreateRun(workspaceId)
   const [activeRun, setActiveRun] = useState<{ id: string; status: string } | null>(null)
+  const [bottomTabId, setBottomTabId] = useState('spec')
 
   function handleValidate() {
     if (!spec) return
@@ -78,6 +79,7 @@ export function EditorPage() {
       if (!result.valid) return
       const run = await createRun.mutateAsync(spec)
       setActiveRun({ id: run.id, status: run.status })
+      setBottomTabId('run')
     } catch {
       return
     }
@@ -138,6 +140,8 @@ export function EditorPage() {
       </div>
 
       <BottomPanel
+        activeTabId={bottomTabId}
+        onActiveTabChange={setBottomTabId}
         tabs={[
           {
             id: 'spec',
