@@ -99,7 +99,7 @@ export function EditorPage() {
 
       <div className="flex-1 min-h-0 flex">
         <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
-        <Canvas spec={spec} onSpecChange={setSpec} nodeLibrary={nodeLibrary} />
+        <Canvas workspaceId={workspaceId} spec={spec} onSpecChange={setSpec} nodeLibrary={nodeLibrary} />
       </div>
 
       <BottomPanel

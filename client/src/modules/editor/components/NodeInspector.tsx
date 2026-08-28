@@ -1,13 +1,17 @@
 import { Input } from '@/shared/components/ui/Input'
 import { NodeDescriptor } from '@/modules/nodes/types'
+import { useResources } from '@/modules/resources/hooks'
 import { GraphNode } from '../types'
 
 interface NodeInspectorProps {
+  workspaceId: string
   node: GraphNode
   descriptor?: NodeDescriptor
   onChange: (params: Record<string, unknown>) => void
   onClose: () => void
 }
+
+const INTERNAL_IO_NODE_TYPES = new Set(['fetch_internal', 'push_internal'])
 
 function fieldValueToText(value: unknown, typeName: string): string {
   if (value === undefined) return ''
@@ -75,9 +79,48 @@ function ParamField({
   )
 }
 
-export function NodeInspector({ node, descriptor, onChange, onClose }: NodeInspectorProps) {
+export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose }: NodeInspectorProps) {
+  const isInternalIoNode = INTERNAL_IO_NODE_TYPES.has(node.type)
+  const { data: resources } = useResources(workspaceId)
+
   function setParam(fieldName: string, value: unknown) {
     onChange({ ...node.params, [fieldName]: value })
+  }
+
+  function renderField(fieldName: string, typeName: string) {
+    if (fieldName === 'bucket') return null
+
+    if (isInternalIoNode && fieldName === 'key') {
+      return (
+        <div key={fieldName} className="flex flex-col gap-1">
+          <label className="text-[10px] font-mono text-muted uppercase">{fieldName}</label>
+          <select
+            className="w-full px-3 py-2 text-sm border border-line rounded-lg bg-white text-ink outline-none focus:border-brand transition-colors"
+            value={typeof node.params[fieldName] === 'string' ? (node.params[fieldName] as string) : ''}
+            onChange={(event) => setParam(fieldName, event.target.value)}
+          >
+            <option value="" disabled>
+              Select a resource
+            </option>
+            {(resources?.keys ?? []).map((resourceKey) => (
+              <option key={resourceKey} value={resourceKey}>
+                {resourceKey}
+              </option>
+            ))}
+          </select>
+        </div>
+      )
+    }
+
+    return (
+      <ParamField
+        key={fieldName}
+        fieldName={fieldName}
+        typeName={typeName}
+        value={node.params[fieldName]}
+        onChange={(value) => setParam(fieldName, value)}
+      />
+    )
   }
 
   return (
@@ -97,24 +140,8 @@ export function NodeInspector({ node, descriptor, onChange, onClose }: NodeInspe
         <p className="text-[12px] text-muted">Unknown node type.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {Object.entries(descriptor.required).map(([fieldName, typeName]) => (
-            <ParamField
-              key={fieldName}
-              fieldName={fieldName}
-              typeName={typeName}
-              value={node.params[fieldName]}
-              onChange={(value) => setParam(fieldName, value)}
-            />
-          ))}
-          {Object.entries(descriptor.optional).map(([fieldName, typeName]) => (
-            <ParamField
-              key={fieldName}
-              fieldName={fieldName}
-              typeName={typeName}
-              value={node.params[fieldName]}
-              onChange={(value) => setParam(fieldName, value)}
-            />
-          ))}
+          {Object.entries(descriptor.required).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
+          {Object.entries(descriptor.optional).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
           {Object.keys(descriptor.required).length === 0 && Object.keys(descriptor.optional).length === 0 && (
             <p className="text-[12px] text-muted">No params for this node.</p>
           )}

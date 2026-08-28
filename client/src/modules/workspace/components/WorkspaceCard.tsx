@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { forwardRef } from 'react'
 import { Card } from '@/shared/components/ui/Card'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Avatar } from '@/shared/components/ui/Avatar'
@@ -10,6 +11,7 @@ interface WorkspaceCardProps {
   isPersonal: boolean
   onDelete: (id: string) => void
   isDeleting: boolean
+  isHighlighted?: boolean
 }
 
 function formatDate(iso: string) {
@@ -20,11 +22,14 @@ function formatDate(iso: string) {
   })
 }
 
-export function WorkspaceCard({ workspace, ownerName, isPersonal, onDelete, isDeleting }: WorkspaceCardProps) {
+export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(function WorkspaceCard(
+  { workspace, ownerName, isPersonal, onDelete, isDeleting, isHighlighted },
+  ref,
+) {
   const navigate = useNavigate()
 
   return (
-    <Card className="cursor-pointer" onClick={() => navigate(`/workspaces/${workspace.id}`)}>
+    <Card ref={ref} highlighted={isHighlighted} className="cursor-pointer" onClick={() => navigate(`/workspaces/${workspace.id}`)}>
       <div className="flex items-start justify-between mb-3.5">
         <div className="w-[34px] h-[34px] rounded-[9px] bg-brand-tint flex items-center justify-center">
           <svg className="w-4 h-4 text-[#0f6e4c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -54,4 +59,4 @@ export function WorkspaceCard({ workspace, ownerName, isPersonal, onDelete, isDe
       </div>
     </Card>
   )
-}
+})

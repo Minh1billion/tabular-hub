@@ -78,12 +78,13 @@ function toGraphSpec(name: string, nodes: Node[], edges: Edge[]): GraphSpec {
 }
 
 interface CanvasProps {
+  workspaceId: string
   spec: GraphSpec
   onSpecChange: (spec: GraphSpec) => void
   nodeLibrary?: NodeLibrary
 }
 
-export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
+export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary }: CanvasProps) {
   const descriptors = useMemo(() => {
     const map = new Map<string, NodeDescriptor>()
     nodeLibrary?.builtin.forEach((descriptor) => map.set(descriptor.type, descriptor))
@@ -250,6 +251,7 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
 
       {selectedGraphNode && (
         <NodeInspector
+          workspaceId={workspaceId}
           node={selectedGraphNode}
           descriptor={descriptors.get(selectedGraphNode.type)}
           onChange={updateSelectedParams}

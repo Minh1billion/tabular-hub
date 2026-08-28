@@ -12,6 +12,7 @@ from app.core.exceptions import NotFoundError
 from app.core.queue import enqueue_run, request_cancel, subscribe_run_events
 from app.database import get_db
 from app.dependencies import get_owned_workspace
+from app.shared.spec import assert_web_supported_nodes, strip_bucket_params
 from app.run import service
 from app.run.schemas import RunCreate, RunEventRead, RunRead, ValidateRequest, ValidateResponse
 from app.workspace.models import Workspace
@@ -22,9 +23,12 @@ router = APIRouter(prefix="/workspaces/{workspace_id}/runs", tags=["runs"])
 def create(
     payload: RunCreate,
     workspace: Workspace = Depends(get_owned_workspace),
+    engine: Engine = Depends(get_engine),
     db: Session = Depends(get_db),
 ):
-    run = service.create_run(db, workspace=workspace, spec=payload.spec, idempotency_key=payload.idempotency_key)
+    spec = strip_bucket_params(payload.spec)
+    assert_web_supported_nodes(spec, engine.registry_provider.get(str(workspace.id)))
+    run = service.create_run(db, workspace=workspace, spec=spec, idempotency_key=payload.idempotency_key)
     if run.status == "queued":
         enqueue_run(str(run.id))
     return run
@@ -35,8 +39,10 @@ def validate(
     workspace: Workspace = Depends(get_owned_workspace),
     engine: Engine = Depends(get_engine),
 ):
+    spec = strip_bucket_params(payload.spec)
+    assert_web_supported_nodes(spec, engine.registry_provider.get(str(workspace.id)))
     result = None
-    for event in engine.execution.validate(payload.spec, bucket=str(workspace.id)):
+    for event in engine.execution.validate(spec, bucket=str(workspace.id)):
         result = event
     if result["event"] == "failed":
         return ValidateResponse(valid=False, error=result["error"])

@@ -12,7 +12,7 @@ export function AppSidebar() {
         title="Workspaces"
         className={cn(
           'w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
-          isActive ? 'bg-brand-deep text-[#ddeee3]' : 'text-muted hover:bg-cream-soft hover:text-slate',
+          isActive ? 'bg-[#32664d] text-[#f5f5ef]' : 'text-muted hover:bg-cream-soft hover:text-slate',
         )}
       >
         <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

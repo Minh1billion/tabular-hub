@@ -1,9 +1,14 @@
-import { useMemo, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
-import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Workspace } from '../types'
 
-const nodeColors = ['#17A672', '#5B8FD6', '#C2540E', '#8A6FD1', '#B8B08C']
+const nodeColors = [
+  'var(--brand)',
+  'var(--accent-teal)',
+  'var(--accent-clay)',
+  'var(--accent-plum)',
+  'var(--accent-gold)',
+  'var(--accent-olive)',
+]
 
 function nodeColorFor(id: string) {
   const index = id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
@@ -15,18 +20,17 @@ interface WorkspaceListPanelProps {
   activeId: string | null
   onSelect: (id: string) => void
   onCreateClick: () => void
+  query: string
+  onQueryChange: (value: string) => void
 }
 
-export function WorkspaceListPanel({ workspaces, activeId, onSelect, onCreateClick }: WorkspaceListPanelProps) {
-  const [query, setQuery] = useState('')
-  const debouncedQuery = useDebounce(query, 150)
-
-  const filtered = useMemo(() => {
-    const term = debouncedQuery.trim().toLowerCase()
-    if (!term) return workspaces
-    return workspaces.filter((workspace) => workspace.name.toLowerCase().includes(term))
-  }, [workspaces, debouncedQuery])
-
+export function WorkspaceListPanel({
+  workspaces,
+  onSelect,
+  onCreateClick,
+  query,
+  onQueryChange,
+}: WorkspaceListPanelProps) {
   return (
     <div className="w-[280px] bg-white border-r border-line flex flex-col p-5">
       <h1 className="font-headline font-semibold text-lg mb-4">Workspaces</h1>
@@ -49,38 +53,32 @@ export function WorkspaceListPanel({ workspaces, activeId, onSelect, onCreateCli
         </svg>
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search workspaces…"
           className="flex-1 outline-none bg-transparent placeholder:text-muted text-ink"
         />
       </div>
 
       <div className="flex flex-col gap-0.5 flex-1 overflow-auto">
-        {filtered.map((workspace) => (
+        {workspaces.map((workspace) => (
           <button
             key={workspace.id}
             type="button"
             onClick={() => onSelect(workspace.id)}
             className={cn(
-              'flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-left transition-colors',
-              workspace.id === activeId ? 'bg-brand-tint' : 'hover:bg-cream-soft',
+              'flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-left transition-colors hover:bg-cream-soft',
             )}
           >
             <span
               className="w-2 h-2 rounded-full shrink-0"
               style={{ background: nodeColorFor(workspace.id) }}
             />
-            <span
-              className={cn(
-                'flex-1 text-[13.5px] font-medium truncate',
-                workspace.id === activeId ? 'text-[#0f6e4c]' : 'text-ink',
-              )}
-            >
+            <span className="flex-1 text-[13.5px] font-medium truncate text-ink">
               {workspace.name}
             </span>
           </button>
         ))}
-        {filtered.length === 0 && (
+        {workspaces.length === 0 && (
           <p className="text-xs text-muted px-2.5 py-4">No workspaces found.</p>
         )}
       </div>
