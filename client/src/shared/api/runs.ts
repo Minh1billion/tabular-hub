@@ -10,6 +10,10 @@ export function getRun(workspaceId: string, runId: string) {
   return apiClient.get<Run>(`/workspaces/${workspaceId}/runs/${runId}`)
 }
 
+export function listRuns(workspaceId: string, limit: number, offset: number) {
+  return apiClient.get<Run[]>(`/workspaces/${workspaceId}/runs?limit=${limit}&offset=${offset}`)
+}
+
 export function getRunEventHistory(workspaceId: string, runId: string) {
   return apiClient.get<RunEvent[]>(`/workspaces/${workspaceId}/runs/${runId}/events/history`)
 }

@@ -117,6 +117,9 @@ export function EditorPage() {
         </Link>
         <span className="text-muted">/</span>
         <span className="text-sm font-medium text-ink truncate">{workspace?.name}</span>
+        <Link to={`/workspaces/${workspaceId}/runs`} className="text-sm text-muted hover:text-ink transition-colors">
+          Run History
+        </Link>
         <div className="flex-1" />
         {validateSpec.isSuccess && (
           <span className={validateSpec.data.valid ? 'text-[12px] text-brand' : 'text-[12px] text-warn'}>

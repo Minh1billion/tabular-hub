@@ -1,9 +1,27 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { cancelRun, createRun, validateSpec } from '@/shared/api/runs'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { cancelRun, createRun, getRun, listRuns, validateSpec } from '@/shared/api/runs'
 
 export function useValidateSpec(workspaceId: string) {
   return useMutation({
     mutationFn: (spec: Record<string, unknown>) => validateSpec(workspaceId, spec),
+  })
+}
+
+export function useRuns(workspaceId: string, limit: number, offset: number) {
+  return useQuery({
+    queryKey: ['workspaces', workspaceId, 'runs', limit, offset],
+    queryFn: () => listRuns(workspaceId, limit, offset),
+    enabled: Boolean(workspaceId),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useRun(workspaceId: string, runId: string | undefined) {
+  return useQuery({
+    queryKey: ['workspaces', workspaceId, 'runs', runId],
+    queryFn: () => getRun(workspaceId, runId as string),
+    enabled: Boolean(workspaceId && runId),
+    retry: false,
   })
 }
 

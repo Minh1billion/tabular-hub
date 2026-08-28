@@ -4,6 +4,7 @@ import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from '@/modules/auth/pages/LoginPage'
 import { WorkspaceListPage } from '@/modules/workspace/pages/WorkspaceListPage'
 import { EditorPage } from '@/modules/editor/pages/EditorPage'
+import { RunHistoryPage } from '@/modules/runs/pages/RunHistoryPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 export const router = createBrowserRouter([
@@ -16,6 +17,8 @@ export const router = createBrowserRouter([
     children: [
       { path: '/workspaces', element: <WorkspaceListPage /> },
       { path: '/workspaces/:id', element: <EditorPage /> },
+      { path: '/workspaces/:workspaceId/runs', element: <RunHistoryPage /> },
+      { path: '/workspaces/:workspaceId/runs/:runId', element: <RunHistoryPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
