@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/shared/hooks/useDebounce'
+import { Button } from '@/shared/components/ui/Button'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
 import { useNodeLibrary } from '@/modules/nodes/hooks'
+import { NodePalette } from '@/modules/nodes/components/NodePalette'
 import { resourcesQueryKey, useResources } from '@/modules/resources/hooks'
 import { ResourceListPanel } from '@/modules/resources/components/ResourceListPanel'
 import { ResourcePreviewPanel } from '@/modules/resources/components/ResourcePreviewPanel'
 import { ImportResourceDialog } from '@/modules/resources/components/ImportResourceDialog'
+import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
+import { RunPanel } from '@/modules/runs/components/RunPanel'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
-import { NodePalette } from '../components/NodePalette'
 import { BottomPanel } from '../components/BottomPanel'
 
 function emptySpec(name: string): GraphSpec {
@@ -59,6 +62,27 @@ export function EditorPage() {
   const hydratedForRef = useRef<string | null>(null)
   const skipNextSaveRef = useRef(true)
 
+  const validateSpec = useValidateSpec(workspaceId)
+  const createRun = useCreateRun(workspaceId)
+  const [activeRun, setActiveRun] = useState<{ id: string; status: string } | null>(null)
+
+  function handleValidate() {
+    if (!spec) return
+    validateSpec.mutate(spec)
+  }
+
+  async function handleRun() {
+    if (!spec) return
+    try {
+      const result = await validateSpec.mutateAsync(spec)
+      if (!result.valid) return
+      const run = await createRun.mutateAsync(spec)
+      setActiveRun({ id: run.id, status: run.status })
+    } catch {
+      return
+    }
+  }
+
   useEffect(() => {
     if (workspace && hydratedForRef.current !== workspace.id) {
       setSpec(workspace.spec ?? emptySpec(workspace.name))
@@ -92,6 +116,17 @@ export function EditorPage() {
         <span className="text-muted">/</span>
         <span className="text-sm font-medium text-ink truncate">{workspace?.name}</span>
         <div className="flex-1" />
+        {validateSpec.isSuccess && (
+          <span className={validateSpec.data.valid ? 'text-[12px] text-brand' : 'text-[12px] text-warn'}>
+            {validateSpec.data.valid ? 'Valid' : validateSpec.data.error}
+          </span>
+        )}
+        <Button type="button" variant="outline" size="sm" onClick={handleValidate} disabled={validateSpec.isPending}>
+          Validate
+        </Button>
+        <Button type="button" variant="primary" size="sm" onClick={handleRun} disabled={createRun.isPending}>
+          Run
+        </Button>
         <span className="font-mono text-[11px] text-muted">
           {updateWorkspace.isPending ? 'Saving…' : 'Saved'}
         </span>
@@ -117,6 +152,15 @@ export function EditorPage() {
             id: 'resources',
             label: 'Resources',
             content: <ResourcesTab workspaceId={workspaceId} />,
+          },
+          {
+            id: 'run',
+            label: 'Run',
+            content: activeRun ? (
+              <RunPanel workspaceId={workspaceId} runId={activeRun.id} initialStatus={activeRun.status} />
+            ) : (
+              <div className="p-3 text-sm text-muted">No run yet.</div>
+            ),
           },
         ]}
       />

@@ -16,10 +16,10 @@ import {
 } from '@xyflow/react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
+import { NODE_DRAG_MIME } from '@/modules/nodes/components/NodePalette'
 import { GraphConnection, GraphNode, GraphSpec } from '../types'
 import { PipelineNode, PipelineNodeData } from './PipelineNode'
-import { NodeInspector } from './NodeInspector'
-import { NODE_DRAG_MIME } from './NodePalette'
+import { NodeInspector } from '../../nodes/components/NodeInspector'
 
 type CanvasContextMenu =
   | { type: 'node'; id: string; x: number; y: number }

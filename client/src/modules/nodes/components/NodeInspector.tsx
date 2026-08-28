@@ -1,7 +1,7 @@
 import { Input } from '@/shared/components/ui/Input'
 import { NodeDescriptor } from '@/modules/nodes/types'
 import { useResources } from '@/modules/resources/hooks'
-import { GraphNode } from '../types'
+import { GraphNode } from '../../editor/types'
 
 interface NodeInspectorProps {
   workspaceId: string
@@ -11,7 +11,7 @@ interface NodeInspectorProps {
   onClose: () => void
 }
 
-const INTERNAL_IO_NODE_TYPES = new Set(['fetch_internal', 'push_internal'])
+const RESOURCE_KEY_DROPDOWN_NODE_TYPES = new Set(['fetch_internal'])
 
 function fieldValueToText(value: unknown, typeName: string): string {
   if (value === undefined) return ''
@@ -80,7 +80,7 @@ function ParamField({
 }
 
 export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose }: NodeInspectorProps) {
-  const isInternalIoNode = INTERNAL_IO_NODE_TYPES.has(node.type)
+  const usesResourceKeyDropdown = RESOURCE_KEY_DROPDOWN_NODE_TYPES.has(node.type)
   const { data: resources } = useResources(workspaceId)
 
   function setParam(fieldName: string, value: unknown) {
@@ -90,7 +90,7 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
   function renderField(fieldName: string, typeName: string) {
     if (fieldName === 'bucket') return null
 
-    if (isInternalIoNode && fieldName === 'key') {
+    if (usesResourceKeyDropdown && fieldName === 'key') {
       return (
         <div key={fieldName} className="flex flex-col gap-1">
           <label className="text-[10px] font-mono text-muted uppercase">{fieldName}</label>
