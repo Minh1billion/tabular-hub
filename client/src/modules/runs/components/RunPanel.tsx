@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Button } from '@/shared/components/ui/Button'
 import { ApiError } from '@/shared/lib/api-client'
 import { useRunEvents } from '@/shared/hooks/useRunEvents'
 import { TERMINAL_RUN_EVENTS } from '@/shared/types/run'
+import { resourcesQueryKey } from '@/modules/resources/hooks'
 import { useCancelRun } from '../hooks'
 import { RunEventTimeline, RUN_BADGE_TONE } from './RunEventTimeline'
 
@@ -17,6 +19,7 @@ export function RunPanel({ workspaceId, runId, initialStatus }: RunPanelProps) {
   const [status, setStatus] = useState(initialStatus)
   const { events, latestEvent } = useRunEvents(workspaceId, runId)
   const cancelRun = useCancelRun(workspaceId)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     setStatus(initialStatus)
@@ -27,6 +30,12 @@ export function RunPanel({ workspaceId, runId, initialStatus }: RunPanelProps) {
       setStatus(latestEvent.event)
     }
   }, [latestEvent])
+
+  useEffect(() => {
+    if (status === 'completed') {
+      queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
+    }
+  }, [status, workspaceId])
 
   const canCancel = status === 'queued' || status === 'running'
 

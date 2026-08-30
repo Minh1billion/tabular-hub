@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { deleteResource, importResource, listResources, previewResource } from './api'
 import { ImportResourcePayload } from './types'
@@ -23,9 +24,16 @@ export function useResourcePreview(workspaceId: string, key: string, limit: numb
 }
 
 export function useImportResource(workspaceId: string) {
-  return useMutation({
-    mutationFn: (payload: ImportResourcePayload) => importResource(workspaceId, payload),
+  const [progress, setProgress] = useState(0)
+
+  const mutation = useMutation({
+    mutationFn: (payload: ImportResourcePayload) => {
+      setProgress(0)
+      return importResource(workspaceId, payload, setProgress)
+    },
   })
+
+  return { ...mutation, progress }
 }
 
 export function useDeleteResource(workspaceId: string) {

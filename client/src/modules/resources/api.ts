@@ -16,7 +16,11 @@ export function deleteResource(workspaceId: string, key: string) {
   return apiClient.delete<void>(`/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}`)
 }
 
-export function importResource(workspaceId: string, payload: ImportResourcePayload) {
+export function importResource(
+  workspaceId: string,
+  payload: ImportResourcePayload,
+  onProgress?: (percent: number) => void,
+) {
   const formData = new FormData()
   formData.append('key', payload.key)
   formData.append('format', payload.format)
@@ -24,5 +28,5 @@ export function importResource(workspaceId: string, payload: ImportResourcePaylo
   formData.append('idempotency_key', crypto.randomUUID())
   formData.append('file', payload.file)
 
-  return apiClient.upload<Run>(`/workspaces/${workspaceId}/resources`, formData)
+  return apiClient.upload<Run>(`/workspaces/${workspaceId}/resources`, formData, onProgress)
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
 import { NodeDescriptor } from '@/modules/nodes/types'
 import { useResources } from '@/modules/resources/hooks'
@@ -43,25 +44,48 @@ function textToFieldValue(text: string, typeName: string): unknown {
   return text
 }
 
+function validateText(text: string, typeName: string): string | null {
+  if (typeName === 'int') {
+    if (text.trim() === '') return null
+    return /^-?\d+$/.test(text.trim()) ? null : 'Must be an integer'
+  }
+  if (typeName === 'float') {
+    if (text.trim() === '') return null
+    return /^-?\d+(\.\d+)?$/.test(text.trim()) ? null : 'Must be a number'
+  }
+  if (typeName === 'dict' || typeName === 'object') {
+    if (text.trim() === '') return null
+    try {
+      JSON.parse(text)
+      return null
+    } catch {
+      return 'Must be valid JSON'
+    }
+  }
+  return null
+}
+
 function ParamField({
   fieldName,
   typeName,
-  value,
-  onChange,
+  text,
+  error,
+  checked,
+  onTextChange,
+  onCheckedChange,
 }: {
   fieldName: string
   typeName: string
-  value: unknown
-  onChange: (value: unknown) => void
+  text: string
+  error?: string
+  checked: boolean
+  onTextChange: (value: string) => void
+  onCheckedChange: (value: boolean) => void
 }) {
   if (typeName === 'bool') {
     return (
       <label className="flex items-center gap-2 text-[13px] text-ink">
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked)}
-        />
+        <input type="checkbox" checked={checked} onChange={(event) => onCheckedChange(event.target.checked)} />
         {fieldName}
       </label>
     )
@@ -70,11 +94,8 @@ function ParamField({
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-mono text-muted uppercase">{fieldName}</label>
-      <Input
-        value={fieldValueToText(value, typeName)}
-        onChange={(event) => onChange(textToFieldValue(event.target.value, typeName))}
-        placeholder={typeName}
-      />
+      <Input value={text} onChange={(event) => onTextChange(event.target.value)} placeholder={typeName} />
+      {error && <span className="text-[11px] text-warn">{error}</span>}
     </div>
   )
 }
@@ -82,9 +103,18 @@ function ParamField({
 export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose }: NodeInspectorProps) {
   const usesResourceKeyDropdown = RESOURCE_KEY_DROPDOWN_NODE_TYPES.has(node.type)
   const { data: resources } = useResources(workspaceId)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   function setParam(fieldName: string, value: unknown) {
     onChange({ ...node.params, [fieldName]: value })
+  }
+
+  function handleFieldInput(fieldName: string, typeName: string, text: string) {
+    setDrafts((current) => ({ ...current, [fieldName]: text }))
+    const error = validateText(text, typeName)
+    setErrors((current) => ({ ...current, [fieldName]: error ?? '' }))
+    if (!error) setParam(fieldName, textToFieldValue(text, typeName))
   }
 
   function renderField(fieldName: string, typeName: string) {
@@ -112,13 +142,18 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
       )
     }
 
+    const text = drafts[fieldName] ?? fieldValueToText(node.params[fieldName], typeName)
+
     return (
       <ParamField
         key={fieldName}
         fieldName={fieldName}
         typeName={typeName}
-        value={node.params[fieldName]}
-        onChange={(value) => setParam(fieldName, value)}
+        text={text}
+        error={errors[fieldName]}
+        checked={Boolean(node.params[fieldName])}
+        onTextChange={(value) => handleFieldInput(fieldName, typeName, value)}
+        onCheckedChange={(value) => setParam(fieldName, value)}
       />
     )
   }

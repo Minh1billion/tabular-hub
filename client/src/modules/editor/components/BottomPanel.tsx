@@ -1,5 +1,11 @@
-import { ReactNode, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
+
+const STORAGE_KEY_OPEN = 'bottomPanel.isOpen'
+const STORAGE_KEY_HEIGHT = 'bottomPanel.height'
+const MIN_HEIGHT = 120
+const MAX_HEIGHT = 720
+const DEFAULT_HEIGHT = 384
 
 interface BottomPanelTab {
   id: string
@@ -16,13 +22,51 @@ interface BottomPanelProps {
 }
 
 export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlledTabId, onActiveTabChange }: BottomPanelProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [isOpen, setIsOpen] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY_OPEN)
+    return stored !== null ? stored === 'true' : defaultOpen
+  })
+  const [height, setHeight] = useState(() => {
+    const stored = Number(localStorage.getItem(STORAGE_KEY_HEIGHT))
+    return stored >= MIN_HEIGHT && stored <= MAX_HEIGHT ? stored : DEFAULT_HEIGHT
+  })
   const [internalTabId, setInternalTabId] = useState(tabs[0]?.id)
   const activeTabId = controlledTabId ?? internalTabId
+  const resizing = useRef(false)
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_OPEN, String(isOpen))
+  }, [isOpen])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_HEIGHT, String(height))
+  }, [height])
 
   function selectTab(tabId: string) {
     setInternalTabId(tabId)
     onActiveTabChange?.(tabId)
+  }
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    resizing.current = true
+    const startY = event.clientY
+    const startHeight = height
+
+    function onMove(moveEvent: PointerEvent) {
+      if (!resizing.current) return
+      const next = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startHeight + (startY - moveEvent.clientY)))
+      setHeight(next)
+    }
+
+    function onUp() {
+      resizing.current = false
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
   return (
@@ -66,12 +110,15 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
       </div>
 
       {isOpen && (
-        <div className="h-96 border-t border-line overflow-auto">
-          {tabs.map((tab) => (
-            <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
-              {tab.content}
-            </div>
-          ))}
+        <div className="flex flex-col border-t border-line" style={{ height }}>
+          <div onPointerDown={startResize} className="h-1 shrink-0 cursor-row-resize hover:bg-brand/40" />
+          <div className="flex-1 min-h-0 overflow-auto">
+            {tabs.map((tab) => (
+              <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
+                {tab.content}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Modal } from '@/shared/components/ui/Modal'
 import { Input } from '@/shared/components/ui/Input'
 import { Button } from '@/shared/components/ui/Button'
@@ -33,6 +33,15 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
   const rowCount = completed
     ? ((lastEvent?.data?.data as { row_count?: number } | undefined)?.row_count ?? 0)
     : undefined
+
+  const notifiedRef = useRef(false)
+
+  useEffect(() => {
+    if (completed && !notifiedRef.current) {
+      notifiedRef.current = true
+      onImported()
+    }
+  }, [completed, onImported])
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -79,6 +88,15 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
           </label>
         </div>
 
+        {importResource.isPending && (
+          <div className="h-1.5 w-full bg-line rounded overflow-hidden">
+            <div
+              className="h-full bg-brand transition-all"
+              style={{ width: `${importResource.progress}%` }}
+            />
+          </div>
+        )}
+
         {importResource.isError && <p className="text-[12px] text-warn">{importResource.error.message}</p>}
 
         {run && (
@@ -94,7 +112,7 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
             {completed ? 'Close' : 'Cancel'}
           </Button>
           {completed ? (
-            <Button type="button" variant="primary" size="sm" onClick={onImported}>
+            <Button type="button" variant="primary" size="sm" onClick={onClose}>
               Done
             </Button>
           ) : (

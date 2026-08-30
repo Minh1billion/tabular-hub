@@ -44,7 +44,6 @@ function ResourcesTab({ workspaceId }: { workspaceId: string }) {
           onClose={() => setIsImporting(false)}
           onImported={() => {
             queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
-            setIsImporting(false)
           }}
         />
       )}
