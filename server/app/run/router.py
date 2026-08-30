@@ -45,13 +45,11 @@ def validate(
     for event in engine.execution.validate(spec, bucket=str(workspace.id)):
         result = event
     if result["event"] == "failed":
-        return ValidateResponse(
-            valid=False,
-            error=result["error"],
-            node_id=result.get("node_id"),
-            node_type=result.get("node_type"),
-        )
-    return ValidateResponse(valid=True)
+        errors = result.get("errors")
+        if errors is None:
+            errors = [{"node_id": result.get("node_id"), "node_type": result.get("node_type"), "message": result["error"]}]
+        return ValidateResponse(valid=False, errors=errors)
+    return ValidateResponse(valid=True, errors=[])
 
 @router.get("", response_model=list[RunRead])
 def list_(

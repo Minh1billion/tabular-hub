@@ -82,11 +82,11 @@ interface CanvasProps {
   spec: GraphSpec
   onSpecChange: (spec: GraphSpec) => void
   nodeLibrary?: NodeLibrary
-  errorNodeId?: string | null
+  errorNodeIds?: string[]
   focusNodeId?: string | null
 }
 
-export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNodeId, focusNodeId }: CanvasProps) {
+export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNodeIds, focusNodeId }: CanvasProps) {
   const descriptors = useMemo(() => {
     const map = new Map<string, NodeDescriptor>()
     nodeLibrary?.builtin.forEach((descriptor) => map.set(descriptor.type, descriptor))
@@ -115,10 +115,10 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
     setNodes((current) =>
       current.map((node) => ({
         ...node,
-        data: { ...node.data, hasError: node.id === errorNodeId },
+        data: { ...node.data, hasError: (errorNodeIds ?? []).includes(node.id) },
       })),
     )
-  }, [errorNodeId, setNodes])
+  }, [errorNodeIds, setNodes])
 
   useEffect(() => {
     if (!focusNodeId) return

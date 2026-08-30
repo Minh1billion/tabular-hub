@@ -107,7 +107,7 @@ def test_validate_valid_spec(auth_client, workspace):
     }
     response = auth_client.post(f"/workspaces/{workspace['id']}/runs/validate", json={"spec": spec})
     assert response.status_code == 200
-    assert response.json() == {"valid": True, "error": None, "node_id": None, "node_type": None}
+    assert response.json() == {"valid": True, "errors": []}
 
 def test_validate_schema_error_returns_node_id(auth_client, workspace):
     spec = {
@@ -126,8 +126,8 @@ def test_validate_schema_error_returns_node_id(auth_client, workspace):
     assert response.status_code == 200
     body = response.json()
     assert body["valid"] is False
-    assert body["node_id"] == "2"
-    assert body["node_type"] == "select"
+    assert body["errors"][0]["node_id"] == "2"
+    assert body["errors"][0]["node_type"] == "select"
 
 def test_validate_invalid_spec_no_entry(auth_client, workspace):
     spec = {"nodes": [], "connections": []}
@@ -135,7 +135,7 @@ def test_validate_invalid_spec_no_entry(auth_client, workspace):
     assert response.status_code == 200
     body = response.json()
     assert body["valid"] is False
-    assert "entry node" in body["error"]
+    assert "entry node" in body["errors"][0]["message"]
 
 def test_validate_unknown_node_type(auth_client, workspace):
     spec = {

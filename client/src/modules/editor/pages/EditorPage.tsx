@@ -65,25 +65,30 @@ function ErrorsTab({
   result: ValidateResponse | null
   onFocusNode: (nodeId: string) => void
 }) {
-  if (!result || result.valid) {
+  if (!result || result.valid || result.errors.length === 0) {
     return <div className="p-3 text-sm text-muted">No errors.</div>
   }
 
-  const node = result.node_id ? spec.nodes.find((n) => n.id === result.node_id) : null
-
   return (
-    <div className="p-3 space-y-2">
-      {node && (
-        <button
-          type="button"
-          onClick={() => onFocusNode(node.id)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded bg-warn-tint hover:opacity-80 transition-opacity"
-        >
-          <span className="text-[12.5px] font-medium text-ink">{node.name}</span>
-          <span className="font-mono text-[10px] text-muted uppercase">{node.type}</span>
-        </button>
-      )}
-      <p className="text-[12.5px] leading-relaxed text-warn">{shortErrorMessage(result.error ?? '')}</p>
+    <div className="p-3 space-y-3">
+      {result.errors.map((error, index) => {
+        const node = error.node_id ? spec.nodes.find((n) => n.id === error.node_id) : null
+        return (
+          <div key={error.node_id ?? index} className="space-y-1">
+            {node && (
+              <button
+                type="button"
+                onClick={() => onFocusNode(node.id)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-warn-tint hover:opacity-80 transition-opacity"
+              >
+                <span className="text-[12.5px] font-medium text-ink">{node.name}</span>
+                <span className="font-mono text-[10px] text-muted uppercase">{node.type}</span>
+              </button>
+            )}
+            <p className="text-[12.5px] leading-relaxed text-warn">{shortErrorMessage(error.message)}</p>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -146,7 +151,10 @@ export function EditorPage() {
     return <div className="h-full flex items-center justify-center text-sm text-muted">Loading workspace…</div>
   }
 
-  const errorNodeId = validateSpec.data && !validateSpec.data.valid ? validateSpec.data.node_id : null
+  const errorNodeIds =
+    validateSpec.data && !validateSpec.data.valid
+      ? validateSpec.data.errors.map((error) => error.node_id).filter((id): id is string => Boolean(id))
+      : []
 
   return (
     <div className="h-full flex flex-col">
@@ -175,7 +183,7 @@ export function EditorPage() {
           spec={spec}
           onSpecChange={setSpec}
           nodeLibrary={nodeLibrary}
-          errorNodeId={errorNodeId}
+          errorNodeIds={errorNodeIds}
           focusNodeId={focusNodeId}
         />
       </div>
@@ -196,7 +204,7 @@ export function EditorPage() {
           {
             id: 'errors',
             label: 'Errors',
-            badge: Boolean(validateSpec.data && !validateSpec.data.valid),
+            badge: Boolean(validateSpec.data && !validateSpec.data.valid && validateSpec.data.errors.length > 0),
             content: (
               <ErrorsTab
                 spec={spec}

@@ -1,11 +1,15 @@
 import { apiClient } from '@/shared/lib/api-client'
 import { Run, RunEvent } from '@/shared/types/run'
 
-export interface ValidateResponse {
-  valid: boolean
-  error: string | null
+export interface NodeError {
   node_id: string | null
   node_type: string | null
+  message: string
+}
+
+export interface ValidateResponse {
+  valid: boolean
+  errors: NodeError[]
 }
 
 export function getRun(workspaceId: string, runId: string) {
