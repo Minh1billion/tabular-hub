@@ -107,8 +107,13 @@ export function EditorPage() {
   const validateSpec = useValidateSpec(workspaceId)
   const createRun = useCreateRun(workspaceId)
   const [activeRun, setActiveRun] = useState<{ id: string; status: string } | null>(null)
-  const [bottomTabId, setBottomTabId] = useState('spec')
+  const [bottomTabId, setBottomTabIdState] = useState(() => localStorage.getItem('bottomPanel.tab') ?? 'spec')
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
+
+  function setBottomTabId(tabId: string) {
+    setBottomTabIdState(tabId)
+    localStorage.setItem('bottomPanel.tab', tabId)
+  }
 
   async function handleRun() {
     if (!spec) return
