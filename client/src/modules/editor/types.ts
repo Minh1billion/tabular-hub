@@ -22,4 +22,5 @@ export interface GraphSpec {
   name: string
   nodes: GraphNode[]
   connections: GraphConnection[]
+  [key: string]: unknown
 }
