@@ -16,7 +16,7 @@ dependencies = [
     "python-jose[cryptography]",
     "redis",
     "python-multipart",
-    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@7b182d969763f985e8af960f64e4b55cc07cf1d8",
+    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@ca133bcf8824b0076bf9eb1da9c31c655748e4c1",
 ]
 
 [dependency-groups]
