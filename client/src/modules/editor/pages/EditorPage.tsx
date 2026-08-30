@@ -11,6 +11,7 @@ import { ResourceListPanel } from '@/modules/resources/components/ResourceListPa
 import { ResourcePreviewPanel } from '@/modules/resources/components/ResourcePreviewPanel'
 import { ImportResourceDialog } from '@/modules/resources/components/ImportResourceDialog'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
+import { ValidateResponse } from '@/modules/runs/types'
 import { RunPanel } from '@/modules/runs/components/RunPanel'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
@@ -51,6 +52,43 @@ function ResourcesTab({ workspaceId }: { workspaceId: string }) {
   )
 }
 
+function shortErrorMessage(error: string) {
+  const withoutPrefix = error.replace(/^Node '.*?' \(.*?\) failed schema inference:\s*/, '')
+  return withoutPrefix.split('\n\n')[0]
+}
+
+function ErrorsTab({
+  spec,
+  result,
+  onFocusNode,
+}: {
+  spec: GraphSpec
+  result: ValidateResponse | null
+  onFocusNode: (nodeId: string) => void
+}) {
+  if (!result || result.valid) {
+    return <div className="p-3 text-sm text-muted">No errors.</div>
+  }
+
+  const node = result.node_id ? spec.nodes.find((n) => n.id === result.node_id) : null
+
+  return (
+    <div className="p-3 space-y-2">
+      {node && (
+        <button
+          type="button"
+          onClick={() => onFocusNode(node.id)}
+          className="flex items-center gap-1.5 px-2 py-1 rounded bg-warn-tint hover:opacity-80 transition-opacity"
+        >
+          <span className="text-[12.5px] font-medium text-ink">{node.name}</span>
+          <span className="font-mono text-[10px] text-muted uppercase">{node.type}</span>
+        </button>
+      )}
+      <p className="text-[12.5px] leading-relaxed text-warn">{shortErrorMessage(result.error ?? '')}</p>
+    </div>
+  )
+}
+
 export function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const workspaceId = id ?? ''
@@ -66,11 +104,7 @@ export function EditorPage() {
   const createRun = useCreateRun(workspaceId)
   const [activeRun, setActiveRun] = useState<{ id: string; status: string } | null>(null)
   const [bottomTabId, setBottomTabId] = useState('spec')
-
-  function handleValidate() {
-    if (!spec) return
-    validateSpec.mutate(spec)
-  }
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
 
   async function handleRun() {
     if (!spec) return
@@ -87,10 +121,13 @@ export function EditorPage() {
 
   useEffect(() => {
     if (workspace && hydratedForRef.current !== workspace.id) {
-      setSpec(workspace.spec ?? emptySpec(workspace.name))
+      const initial = workspace.spec ?? emptySpec(workspace.name)
+      setSpec(initial)
       hydratedForRef.current = workspace.id
       skipNextSaveRef.current = true
+      if (initial.nodes.length > 0) validateSpec.mutate(initial)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspace])
 
   const debouncedSpec = useDebounce(spec, 500)
@@ -102,12 +139,15 @@ export function EditorPage() {
       return
     }
     updateWorkspace.mutate({ spec: debouncedSpec })
+    validateSpec.mutate(debouncedSpec)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSpec])
 
   if (isLoading || !spec) {
     return <div className="h-full flex items-center justify-center text-sm text-muted">Loading workspace…</div>
   }
+
+  const errorNodeId = validateSpec.data && !validateSpec.data.valid ? validateSpec.data.node_id : null
 
   return (
     <div className="h-full flex flex-col">
@@ -121,14 +161,6 @@ export function EditorPage() {
           Run History
         </Link>
         <div className="flex-1" />
-        {validateSpec.isSuccess && (
-          <span className={validateSpec.data.valid ? 'text-[12px] text-brand' : 'text-[12px] text-warn'}>
-            {validateSpec.data.valid ? 'Valid' : validateSpec.data.error}
-          </span>
-        )}
-        <Button type="button" variant="outline" size="sm" onClick={handleValidate} disabled={validateSpec.isPending}>
-          Validate
-        </Button>
         <Button type="button" variant="primary" size="sm" onClick={handleRun} disabled={createRun.isPending}>
           Run
         </Button>
@@ -139,7 +171,14 @@ export function EditorPage() {
 
       <div className="flex-1 min-h-0 flex">
         <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
-        <Canvas workspaceId={workspaceId} spec={spec} onSpecChange={setSpec} nodeLibrary={nodeLibrary} />
+        <Canvas
+          workspaceId={workspaceId}
+          spec={spec}
+          onSpecChange={setSpec}
+          nodeLibrary={nodeLibrary}
+          errorNodeId={errorNodeId}
+          focusNodeId={focusNodeId}
+        />
       </div>
 
       <BottomPanel
@@ -153,6 +192,18 @@ export function EditorPage() {
               <pre className="p-3 font-mono text-[12px] leading-relaxed text-ink whitespace-pre-wrap break-all">
                 {JSON.stringify(spec, null, 2)}
               </pre>
+            ),
+          },
+          {
+            id: 'errors',
+            label: 'Errors',
+            badge: Boolean(validateSpec.data && !validateSpec.data.valid),
+            content: (
+              <ErrorsTab
+                spec={spec}
+                result={validateSpec.data ?? null}
+                onFocusNode={(nodeId) => setFocusNodeId(nodeId)}
+              />
             ),
           },
           {

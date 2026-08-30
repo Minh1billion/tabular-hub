@@ -4,6 +4,8 @@ import { Run, RunEvent } from '@/shared/types/run'
 export interface ValidateResponse {
   valid: boolean
   error: string | null
+  node_id: string | null
+  node_type: string | null
 }
 
 export function getRun(workspaceId: string, runId: string) {

@@ -5,6 +5,7 @@ interface BottomPanelTab {
   id: string
   label: string
   content: ReactNode
+  badge?: boolean
 }
 
 interface BottomPanelProps {
@@ -43,6 +44,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
             )}
           >
             {tab.label}
+            {tab.badge && <span className="inline-block w-1.5 h-1.5 rounded-full bg-warn ml-1.5 align-middle" />}
           </button>
         ))}
         <div className="flex-1" />

@@ -7,13 +7,14 @@ export interface PipelineNodeData {
   nodeType: string
   params: Record<string, unknown>
   descriptor?: NodeDescriptor
+  hasError?: boolean
   [key: string]: unknown
 }
 
 const handleClasses = '!w-2.5 !h-2.5 !border-2 !border-white !bg-muted hover:!bg-brand transition-colors'
 
 export function PipelineNode({ data, selected }: NodeProps) {
-  const { label, nodeType, descriptor } = data as PipelineNodeData
+  const { label, nodeType, descriptor, hasError } = data as PipelineNodeData
 
   const inPorts = descriptor?.fan_in ? descriptor.in_ports ?? [] : []
   const outPorts = descriptor && descriptor.ports_out.length > 1 ? descriptor.ports_out : []
@@ -22,7 +23,11 @@ export function PipelineNode({ data, selected }: NodeProps) {
     <div
       className={cn(
         'relative min-w-[168px] bg-white border rounded-card px-3.5 py-3 transition-colors',
-        selected ? 'border-brand shadow-[0_0_0_1.5px_var(--brand)]' : 'border-line',
+        hasError
+          ? 'border-warn shadow-[0_0_0_1.5px_var(--warn)]'
+          : selected
+            ? 'border-brand shadow-[0_0_0_1.5px_var(--brand)]'
+            : 'border-line',
       )}
     >
       {inPorts.length === 2 ? (

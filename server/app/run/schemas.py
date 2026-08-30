@@ -36,3 +36,5 @@ class ValidateRequest(BaseModel):
 class ValidateResponse(BaseModel):
     valid: bool
     error: str | None = None
+    node_id: str | None = None
+    node_type: str | None = None

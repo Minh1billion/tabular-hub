@@ -82,9 +82,11 @@ interface CanvasProps {
   spec: GraphSpec
   onSpecChange: (spec: GraphSpec) => void
   nodeLibrary?: NodeLibrary
+  errorNodeId?: string | null
+  focusNodeId?: string | null
 }
 
-export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary }: CanvasProps) {
+export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNodeId, focusNodeId }: CanvasProps) {
   const descriptors = useMemo(() => {
     const map = new Map<string, NodeDescriptor>()
     nodeLibrary?.builtin.forEach((descriptor) => map.set(descriptor.type, descriptor))
@@ -108,6 +110,26 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary }: CanvasP
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [descriptors])
+
+  useEffect(() => {
+    setNodes((current) =>
+      current.map((node) => ({
+        ...node,
+        data: { ...node.data, hasError: node.id === errorNodeId },
+      })),
+    )
+  }, [errorNodeId, setNodes])
+
+  useEffect(() => {
+    if (!focusNodeId) return
+    setNodes((current) => current.map((node) => ({ ...node, selected: node.id === focusNodeId })))
+    setSelectedNodeId(focusNodeId)
+    const target = nodes.find((node) => node.id === focusNodeId)
+    if (target && reactFlowInstance.current) {
+      reactFlowInstance.current.setCenter(target.position.x, target.position.y, { zoom: 1, duration: 300 })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNodeId])
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -197,8 +219,14 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary }: CanvasP
     setSelectedNodeId(null)
   }, [setNodes])
 
+  const lastPushedSpecRef = useRef<string | null>(null)
+
   useEffect(() => {
-    onSpecChange(toGraphSpec(spec.name, nodes, edges))
+    const nextSpec = toGraphSpec(spec.name, nodes, edges)
+    const serialized = JSON.stringify(nextSpec)
+    if (serialized === lastPushedSpecRef.current) return
+    lastPushedSpecRef.current = serialized
+    onSpecChange(nextSpec)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges])
 

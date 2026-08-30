@@ -107,7 +107,27 @@ def test_validate_valid_spec(auth_client, workspace):
     }
     response = auth_client.post(f"/workspaces/{workspace['id']}/runs/validate", json={"spec": spec})
     assert response.status_code == 200
-    assert response.json() == {"valid": True, "error": None}
+    assert response.json() == {"valid": True, "error": None, "node_id": None, "node_type": None}
+
+def test_validate_schema_error_returns_node_id(auth_client, workspace):
+    spec = {
+        "nodes": [
+            {
+                "id": "1",
+                "type": "fetch_internal",
+                "name": "Fetch",
+                "params": {"key": "raw", "schema": {"a": "Int64"}},
+            },
+            {"id": "2", "type": "select", "name": "Select", "params": {"columns": ["ghost"]}},
+        ],
+        "connections": [{"from": "1", "to": "2"}],
+    }
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/validate", json={"spec": spec})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["node_id"] == "2"
+    assert body["node_type"] == "select"
 
 def test_validate_invalid_spec_no_entry(auth_client, workspace):
     spec = {"nodes": [], "connections": []}
