@@ -1,6 +1,6 @@
 import { Handle, NodeProps, Position } from '@xyflow/react'
 import { cn } from '@/shared/lib/cn'
-import { NodeDescriptor } from '@/modules/nodes/types'
+import { NodeDescriptor } from '@/modules/editor/types'
 
 export interface PipelineNodeData {
   label: string

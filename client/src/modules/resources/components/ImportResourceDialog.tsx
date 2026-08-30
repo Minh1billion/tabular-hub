@@ -3,8 +3,8 @@ import { Modal } from '@/shared/components/ui/Modal'
 import { Input } from '@/shared/components/ui/Input'
 import { Button } from '@/shared/components/ui/Button'
 import { Badge } from '@/shared/components/ui/Badge'
-import { useRunTracking } from '@/shared/hooks/useRunTracking'
-import { useRunEventHistory } from '@/shared/hooks/useRunEventHistory'
+import { useRunTracking } from '@/modules/runs/hooks-tracking'
+import { useRunEventHistory } from '@/modules/runs/hooks-event-history'
 import { useImportResource } from '../hooks'
 
 const FORMATS = ['csv', 'parquet', 'arrow', 'json']

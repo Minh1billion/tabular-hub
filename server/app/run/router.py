@@ -12,7 +12,7 @@ from app.core.exceptions import NotFoundError
 from app.core.queue import enqueue_run, request_cancel, subscribe_run_events
 from app.database import get_db
 from app.dependencies import get_owned_workspace
-from app.shared.spec import assert_web_supported_nodes, strip_bucket_params
+from app.run.spec import assert_web_supported_nodes, strip_bucket_params
 from app.run import service
 from app.run.schemas import RunCreate, RunEventRead, RunRead, ValidateRequest, ValidateResponse
 from app.workspace.models import Workspace

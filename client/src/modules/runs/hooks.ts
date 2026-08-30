@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelRun, createRun, getRun, listRuns, validateSpec } from '@/shared/api/runs'
+import { cancelRun, createRun, getRun, listRuns, validateSpec } from './api'
 
 export function useValidateSpec(workspaceId: string) {
   return useMutation({

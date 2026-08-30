@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getRun } from '@/shared/api/runs'
-import { Run, TERMINAL_RUN_EVENTS } from '@/shared/types/run'
+import { getRun } from './api'
+import { Run, TERMINAL_RUN_EVENTS } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 

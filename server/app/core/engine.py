@@ -41,3 +41,9 @@ def get_engine() -> Engine:
         return engine_lifecycle.engine
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+def drain_events(events) -> dict:
+    result = None
+    for event in events:
+        result = event
+    return result

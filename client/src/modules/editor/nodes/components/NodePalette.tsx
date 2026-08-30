@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
-import { useUnregisterNode } from '@/modules/nodes/hooks'
+import { NodeDescriptor, NodeLibrary } from '@/modules/editor/types'
+import { useUnregisterNode } from '@/modules/editor/nodes/hooks'
 import { Input } from '@/shared/components/ui/Input'
 import { RegisterNodeDialog } from './RegisterNodeDialog'
 

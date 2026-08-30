@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Button } from '@/shared/components/ui/Button'
 import { ApiError } from '@/shared/lib/api-client'
-import { useRunEvents } from '@/shared/hooks/useRunEvents'
+import { useRunEvents } from '@/modules/runs/hooks-events'
 import { useRun, useRuns } from '../hooks'
 import { RunEventTimeline, RUN_BADGE_TONE } from '../components/RunEventTimeline'
 

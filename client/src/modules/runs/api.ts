@@ -1,16 +1,7 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { Run, RunEvent } from '@/shared/types/run'
+import { NodeError, Run, RunEvent, ValidateResponse } from './types'
 
-export interface NodeError {
-  node_id: string | null
-  node_type: string | null
-  message: string
-}
-
-export interface ValidateResponse {
-  valid: boolean
-  errors: NodeError[]
-}
+export type { NodeError, ValidateResponse }
 
 export function getRun(workspaceId: string, runId: string) {
   return apiClient.get<Run>(`/workspaces/${workspaceId}/runs/${runId}`)

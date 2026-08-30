@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '@/shared/lib/api-client'
-import { RunStreamEvent, TERMINAL_RUN_EVENTS } from '@/shared/types/run'
+import { RunStreamEvent, TERMINAL_RUN_EVENTS } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 

@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { Run } from '@/shared/types/run'
+import { Run } from '@/modules/runs/types'
 import { ImportResourcePayload, ResourceListResponse, ResourcePreview } from './types'
 
 export function listResources(workspaceId: string) {

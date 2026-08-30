@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { listNodes, registerNode, unregisterNode } from './api'
-import { RegisterNodePayload } from './types'
+import { RegisterNodePayload } from '../types'
 
 export const nodeLibraryQueryKey = (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const
 

@@ -1,4 +1,4 @@
-import { RunStreamEvent } from '@/shared/types/run'
+import { RunStreamEvent } from '../types'
 
 interface RunEventTimelineProps {
   events: RunStreamEvent[]

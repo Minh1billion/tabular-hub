@@ -1,12 +1,19 @@
 import json
 from datetime import datetime, timezone
 
+import polars as pl
 import pytest
 from httpx import ASGITransport, AsyncClient
+from tabular_manner.engine.application.io.resource_storage import ResourceStorage
 
 import app.core.queue as queue_module
+from app.core.engine import engine_lifecycle
 from app.core.security import create_access_token
 from app.main import app
+
+def _seed_raw_resource(workspace_id: str) -> None:
+    resource_storage = ResourceStorage(repository=engine_lifecycle.engine.object_storage.resource_repository)
+    resource_storage.save("raw", pl.DataFrame({"a": [1, 2]}).lazy(), bucket=workspace_id)
 
 @pytest.fixture
 def workspace(auth_client):
@@ -101,6 +108,7 @@ def test_list_runs_empty(auth_client, workspace):
     assert response.json() == []
 
 def test_validate_valid_spec(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
     spec = {
         "nodes": [{"id": "1", "type": "fetch_internal", "name": "Fetch", "params": {"key": "raw"}}],
         "connections": [],
@@ -110,6 +118,7 @@ def test_validate_valid_spec(auth_client, workspace):
     assert response.json() == {"valid": True, "errors": []}
 
 def test_validate_schema_error_returns_node_id(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
     spec = {
         "nodes": [
             {

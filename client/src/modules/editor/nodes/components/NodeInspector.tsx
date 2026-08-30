@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
-import { NodeDescriptor } from '@/modules/nodes/types'
+import { NodeDescriptor } from '@/modules/editor/types'
 import { useResources } from '@/modules/resources/hooks'
-import { GraphNode } from '../../editor/types'
+import { GraphNode } from '../../types'
 
 interface NodeInspectorProps {
   workspaceId: string

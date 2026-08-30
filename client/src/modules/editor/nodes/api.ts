@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { NodeLibrary, RegisterNodePayload } from './types'
+import { NodeLibrary, RegisterNodePayload } from '../types'
 
 export function listNodes(workspaceId: string) {
   return apiClient.get<NodeLibrary>(`/workspaces/${workspaceId}/nodes`)
