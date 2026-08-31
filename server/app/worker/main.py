@@ -23,6 +23,7 @@ def run() -> None:
         while True:
             try:
                 messages = claim_idle_tasks(consumer, IDLE_RECLAIM_MS)
+                reclaimed = bool(messages)
                 if not messages:
                     messages = read_tasks(consumer)
             except (redis.exceptions.TimeoutError, redis.exceptions.ConnectionError):
@@ -30,7 +31,7 @@ def run() -> None:
 
             for message_id, fields in messages:
                 try:
-                    ok = process_task(engine_lifecycle, fields["run_id"])
+                    ok = process_task(engine_lifecycle, fields["run_id"], reclaimed=reclaimed)
                 except Exception:
                     logger.exception("failed to process run %s", fields["run_id"])
                     ok = False

@@ -20,12 +20,13 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
         spec=run.spec, bucket=bucket, cancel_check=lambda: is_cancel_requested(run_id)
     )
 
-def process_task(engine_lifecycle: EngineLifecycle, run_id: str) -> bool:
+def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool = False) -> bool:
     db = SessionLocal()
     try:
+        statuses = ["queued", "running"] if reclaimed else ["queued"]
         updated = (
             db.query(Run)
-            .filter(Run.id == run_id, Run.status == "queued")
+            .filter(Run.id == run_id, Run.status.in_(statuses))
             .update({"status": "running", "attempt": Run.attempt + 1}, synchronize_session=False)
         )
         db.commit()
