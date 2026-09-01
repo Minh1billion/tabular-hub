@@ -1,20 +1,7 @@
 import { useState } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Workspace } from '../types'
-
-const nodeColors = [
-  'var(--brand)',
-  'var(--accent-teal)',
-  'var(--accent-clay)',
-  'var(--accent-plum)',
-  'var(--accent-gold)',
-  'var(--accent-olive)',
-]
-
-function nodeColorFor(id: string) {
-  const index = id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
-  return nodeColors[index % nodeColors.length]
-}
+import { workspaceColorFor } from '../lib/color'
 
 interface WorkspaceListPanelProps {
   workspaces: Workspace[]
@@ -38,10 +25,15 @@ export function WorkspaceListPanel({
     <div
       className={cn(
         'm-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
-        isOpen ? 'w-[280px]' : 'w-[52px]',
+        isOpen ? 'w-[280px]' : 'w-[60px]',
       )}
     >
-      <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black shrink-0">
+      <div
+        className={cn(
+          'flex items-center px-5 py-4 border-b-2 border-black shrink-0',
+          isOpen ? 'justify-between' : 'justify-center',
+        )}
+      >
         <h1
           className={cn(
             'font-headline font-semibold text-lg whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
@@ -69,8 +61,37 @@ export function WorkspaceListPanel({
 
       <div
         className={cn(
-          'w-[280px] shrink-0 flex-1 min-h-0 flex flex-col p-5 transition-opacity duration-200 ease-in-out',
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          'thin-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 px-2.5 py-3 transition-opacity duration-200 ease-in-out',
+          isOpen ? 'hidden opacity-0 pointer-events-none' : 'flex opacity-100',
+        )}
+      >
+        <button
+          type="button"
+          onClick={onCreateClick}
+          title="New workspace"
+          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-line bg-white text-muted hover:border-brand hover:text-brand transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        {workspaces.map((workspace) => (
+          <button
+            key={workspace.id}
+            type="button"
+            title={workspace.name}
+            onClick={() => onSelect(workspace.id)}
+            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-line bg-white hover:border-brand transition-colors"
+          >
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: workspaceColorFor(workspace.id) }} />
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          'w-full shrink-0 flex-1 min-h-0 flex flex-col p-5 transition-opacity duration-200 ease-in-out',
+          isOpen ? 'opacity-100' : 'hidden opacity-0 pointer-events-none',
         )}
       >
         <button
@@ -107,7 +128,7 @@ export function WorkspaceListPanel({
             >
               <span
                 className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: nodeColorFor(workspace.id) }}
+                style={{ background: workspaceColorFor(workspace.id) }}
               />
               <span className="flex-1 text-[13.5px] font-medium truncate text-ink">
                 {workspace.name}

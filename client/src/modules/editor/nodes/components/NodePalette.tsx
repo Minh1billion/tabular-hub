@@ -15,6 +15,49 @@ function categoryOf(descriptor: NodeDescriptor): string {
   return 'Transform'
 }
 
+function CategoryIcon({ category, className }: { category: string; className?: string }) {
+  const common = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 } as const
+  switch (category) {
+    case 'IO':
+      return (
+        <svg className={className} {...common}>
+          <path d="M12 3v12" strokeLinecap="round" />
+          <path d="m7 10 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 19h16" strokeLinecap="round" />
+        </svg>
+      )
+    case 'Merge':
+      return (
+        <svg className={className} {...common}>
+          <circle cx="6" cy="6" r="2" />
+          <circle cx="6" cy="18" r="2" />
+          <circle cx="18" cy="12" r="2" />
+          <path d="M6 8v3a5 5 0 0 0 5 5h1" strokeLinecap="round" />
+          <path d="M6 16v-3" strokeLinecap="round" />
+          <path d="M14 12h2" strokeLinecap="round" />
+        </svg>
+      )
+    case 'Custom':
+      return (
+        <svg className={className} {...common}>
+          <path d="M4 8h3.5a1.5 1.5 0 0 0 0-3A1.5 1.5 0 0 1 9 3.5 1.5 1.5 0 0 1 10.5 5H14a1 1 0 0 1 1 1v3.5a1.5 1.5 0 0 0 3 0A1.5 1.5 0 0 1 19.5 11 1.5 1.5 0 0 1 21 12.5a1.5 1.5 0 0 1-1.5 1.5 1.5 1.5 0 0 0 0 3A1.5 1.5 0 0 1 21 18.5 1.5 1.5 0 0 1 19.5 20H4v-3.5a1.5 1.5 0 0 1 1.5-1.5 1.5 1.5 0 0 0 0-3A1.5 1.5 0 0 1 4 10.5Z" strokeLinejoin="round" />
+        </svg>
+      )
+    default:
+      // Transform
+      return (
+        <svg className={className} {...common}>
+          <path d="M4 6h10" strokeLinecap="round" />
+          <circle cx="17" cy="6" r="2" />
+          <path d="M20 18H10" strokeLinecap="round" />
+          <circle cx="7" cy="18" r="2" />
+          <path d="M4 12h5" strokeLinecap="round" />
+          <path d="M15 12h5" strokeLinecap="round" />
+        </svg>
+      )
+  }
+}
+
 function groupByCategory(descriptors: NodeDescriptor[]) {
   const groups = new Map<string, NodeDescriptor[]>()
   for (const descriptor of descriptors) {
@@ -31,22 +74,26 @@ interface NodePaletteProps {
   nodeLibrary?: NodeLibrary
 }
 
-function NodeItem({ descriptor }: { descriptor: NodeDescriptor }) {
+function NodeItem({ descriptor, category }: { descriptor: NodeDescriptor; category: string }) {
   return (
     <div
       draggable
+      title={descriptor.type}
       onDragStart={(event) => {
         event.dataTransfer.setData(NODE_DRAG_MIME, descriptor.type)
         event.dataTransfer.effectAllowed = 'move'
       }}
-      className="px-2.5 py-2 rounded-lg border border-line bg-white cursor-grab active:cursor-grabbing hover:border-brand transition-colors"
+      className="flex items-start gap-2 px-2.5 py-2 min-h-[42px] rounded-lg border border-line bg-white cursor-grab active:cursor-grabbing hover:border-brand transition-colors"
     >
-      <div className="font-mono text-[10px] tracking-wide text-muted uppercase">{descriptor.type}</div>
-      {Object.keys(descriptor.required).length > 0 && (
-        <div className="text-[11px] text-slate truncate mt-0.5">
-          {Object.keys(descriptor.required).join(', ')}
-        </div>
-      )}
+      <CategoryIcon category={category} className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted" />
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[10px] tracking-wide text-muted uppercase truncate">{descriptor.type}</div>
+        {Object.keys(descriptor.required).length > 0 && (
+          <div className="text-[11px] text-slate truncate mt-0.5">
+            {Object.keys(descriptor.required).join(', ')}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -64,13 +111,15 @@ function CustomNodeItem({
     <div className="flex items-center gap-1.5">
       <div
         draggable
+        title={descriptor.type}
         onDragStart={(event) => {
           event.dataTransfer.setData(NODE_DRAG_MIME, descriptor.type)
           event.dataTransfer.effectAllowed = 'move'
         }}
-        className="flex-1 px-2.5 py-2 rounded-lg border border-line bg-white cursor-grab active:cursor-grabbing hover:border-brand transition-colors"
+        className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-2 min-h-[42px] rounded-lg border border-line bg-white cursor-grab active:cursor-grabbing hover:border-brand transition-colors"
       >
-        <div className="font-mono text-[10px] tracking-wide text-muted uppercase">{descriptor.type}</div>
+        <CategoryIcon category="Custom" className="w-3.5 h-3.5 shrink-0 text-muted" />
+        <div className="font-mono text-[10px] tracking-wide text-muted uppercase truncate">{descriptor.type}</div>
       </div>
       <button
         type="button"
@@ -102,15 +151,27 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
     [nodeLibrary, query],
   )
   const groupedBuiltin = useMemo(() => groupByCategory(filteredBuiltin), [filteredBuiltin])
+  const allDescriptors = useMemo(
+    () => [
+      ...groupedBuiltin.flatMap(([label, descriptors]) => descriptors.map((d) => ({ descriptor: d, category: label }))),
+      ...filteredCustom.map((d) => ({ descriptor: d, category: 'Custom' })),
+    ],
+    [groupedBuiltin, filteredCustom],
+  )
 
   return (
     <div
       className={cn(
         'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
-        isOpen ? 'w-[240px]' : 'w-[52px]',
+        isOpen ? 'w-[264px]' : 'w-[60px]',
       )}
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-black shrink-0">
+      <div
+        className={cn(
+          'flex items-center px-4 py-3 border-b-2 border-black shrink-0',
+          isOpen ? 'justify-between' : 'justify-center',
+        )}
+      >
         <h2
           className={cn(
             'font-headline font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
@@ -138,8 +199,31 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
 
       <div
         className={cn(
-          'w-[240px] shrink-0 flex-1 min-h-0 overflow-auto p-4 transition-opacity duration-200 ease-in-out',
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          'thin-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 px-2.5 py-3 transition-opacity duration-200 ease-in-out',
+          isOpen ? 'hidden opacity-0 pointer-events-none' : 'flex opacity-100',
+        )}
+      >
+        {allDescriptors.map(({ descriptor, category }) => (
+          <div
+            key={descriptor.type}
+            draggable
+            title={descriptor.type}
+            onDragStart={(event) => {
+              event.dataTransfer.setData(NODE_DRAG_MIME, descriptor.type)
+              event.dataTransfer.effectAllowed = 'move'
+            }}
+            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-line bg-white cursor-grab active:cursor-grabbing hover:border-brand hover:text-brand transition-colors text-muted"
+          >
+            <CategoryIcon category={category} className="w-3.5 h-3.5" />
+          </div>
+        ))}
+        {allDescriptors.length === 0 && <div className="w-1.5 h-1.5 rounded-full bg-line mt-1" />}
+      </div>
+
+      <div
+        className={cn(
+          'w-full shrink-0 flex-1 min-h-0 overflow-auto p-4 transition-opacity duration-200 ease-in-out',
+          isOpen ? 'opacity-100' : 'hidden opacity-0 pointer-events-none',
         )}
       >
         <Input
@@ -151,17 +235,23 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
 
         {groupedBuiltin.map(([label, descriptors]) => (
           <div key={label} className="mb-5">
-            <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <CategoryIcon category={label} className="w-3 h-3 text-muted shrink-0" />
+              <div className="font-mono text-[10px] tracking-wide text-muted uppercase">{label}</div>
+            </div>
             <div className="flex flex-col gap-1.5">
               {descriptors.map((descriptor) => (
-                <NodeItem key={descriptor.type} descriptor={descriptor} />
+                <NodeItem key={descriptor.type} descriptor={descriptor} category={label} />
               ))}
             </div>
           </div>
         ))}
 
         <div className="flex items-center justify-between mb-2">
-          <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
+          <div className="flex items-center gap-1.5">
+            <CategoryIcon category="Custom" className="w-3 h-3 text-muted shrink-0" />
+            <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
+          </div>
           <button type="button" onClick={() => setIsRegistering(true)} className="text-muted hover:text-brand transition-colors">
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
               <path d="M12 5v14M5 12h14" />

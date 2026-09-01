@@ -20,7 +20,7 @@ def list_workspaces(db: Session, *, owner_id: uuid.UUID) -> list[Workspace]:
     return (
         db.query(Workspace)
         .filter(Workspace.owner_id == owner_id, Workspace.deleted_at.is_(None))
-        .order_by(Workspace.created_at.desc())
+        .order_by(Workspace.created_at.asc())
         .all()
     )
 

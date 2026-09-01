@@ -9,6 +9,22 @@
   box-sizing: border-box;
 }
 
+/* Thin, unobtrusive scrollbar for icon rails so it doesn't crowd narrow collapsed panels. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--line);
+  border-radius: 999px;
+}
+
 @keyframes node-settle {
   from {
     opacity: 0;
