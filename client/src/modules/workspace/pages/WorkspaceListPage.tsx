@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCurrentUser } from '@/modules/auth/hooks'
 import { useDebounce } from '@/shared/hooks/useDebounce'
+import { GridPattern } from '@/shared/components/ui/GridPattern'
 import { useCreateWorkspace, useDeleteWorkspace, useWorkspaces } from '../hooks'
 import { WorkspaceListPanel } from '../components/WorkspaceListPanel'
 import { WorkspaceCard } from '../components/WorkspaceCard'
@@ -51,8 +52,10 @@ export function WorkspaceListPage() {
         onQueryChange={setQuery}
       />
 
-      <main className="flex-1 overflow-auto px-10 py-8">
-        <div className="flex items-end justify-between mb-6">
+      <main className="relative flex-1 overflow-auto px-10 py-8">
+        <GridPattern cellSize={28} />
+
+        <div className="relative flex items-end justify-between mb-6">
           <div>
             <h2 className="font-headline font-semibold text-[22px] mb-1.5">Your workspaces</h2>
             <p className="text-[13.5px] text-slate">Manage your workspaces and the tables inside them.</p>
@@ -60,9 +63,9 @@ export function WorkspaceListPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-muted">Loading workspaces…</p>
+          <p className="relative text-sm text-muted">Loading workspaces…</p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3.5">
+          <div className="relative grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3.5">
             {filteredWorkspaces.map((workspace) => (
               <WorkspaceCard
                 key={workspace.id}

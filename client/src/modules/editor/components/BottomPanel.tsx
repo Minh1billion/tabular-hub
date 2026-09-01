@@ -70,7 +70,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
   }
 
   return (
-    <div className="shrink-0 bg-white border-t border-line flex flex-col">
+    <div className="shrink-0 mx-3 mb-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden">
       <div className="h-8 flex items-center px-2 gap-1 shrink-0">
         {tabs.map((tab) => (
           <button
@@ -110,7 +110,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
       </div>
 
       {isOpen && (
-        <div className="flex flex-col border-t border-line" style={{ height }}>
+        <div className="flex flex-col border-t-2 border-black" style={{ height }}>
           <div onPointerDown={startResize} className="h-1 shrink-0 cursor-row-resize hover:bg-brand/40" />
           <div className="flex-1 min-h-0 overflow-auto">
             {tabs.map((tab) => (

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/editor/types'
 import { useUnregisterNode } from '@/modules/editor/nodes/hooks'
 import { Input } from '@/shared/components/ui/Input'
+import { cn } from '@/shared/lib/cn'
 import { RegisterNodeDialog } from './RegisterNodeDialog'
 
 export const NODE_DRAG_MIME = 'application/tabular-node-type'
@@ -86,6 +87,7 @@ function CustomNodeItem({
 }
 
 export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
+  const [isOpen, setIsOpen] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
   const [search, setSearch] = useState('')
   const unregisterNode = useUnregisterNode(workspaceId)
@@ -102,46 +104,72 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
   const groupedBuiltin = useMemo(() => groupByCategory(filteredBuiltin), [filteredBuiltin])
 
   return (
-    <div className="w-[240px] bg-white border-r border-line flex flex-col p-4 overflow-auto">
-      <h2 className="font-headline font-semibold text-sm mb-3">Node library</h2>
-
-      <Input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search nodes…"
-        className="mb-4"
-      />
-
-      {groupedBuiltin.map(([label, descriptors]) => (
-        <div key={label} className="mb-5">
-          <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
-          <div className="flex flex-col gap-1.5">
-            {descriptors.map((descriptor) => (
-              <NodeItem key={descriptor.type} descriptor={descriptor} />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
-        <button type="button" onClick={() => setIsRegistering(true)} className="text-muted hover:text-brand transition-colors">
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M12 5v14M5 12h14" />
+    <div
+      className={cn(
+        'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden',
+        isOpen ? 'w-[240px]' : 'w-[52px]',
+      )}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-black shrink-0">
+        {isOpen && <h2 className="font-headline font-semibold text-sm">Node library</h2>}
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          className="text-muted hover:text-ink transition-colors shrink-0"
+        >
+          <svg
+            className={cn('w-3.5 h-3.5 transition-transform', isOpen ? '' : 'rotate-180')}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M15 6l-6 6 6 6" />
           </svg>
         </button>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        {filteredCustom.map((descriptor) => (
-          <CustomNodeItem
-            key={descriptor.type}
-            descriptor={descriptor}
-            onDelete={(name) => unregisterNode.mutate(name)}
-            isDeleting={unregisterNode.isPending && unregisterNode.variables === descriptor.type}
+      {isOpen && (
+        <div className="flex-1 min-h-0 overflow-auto p-4">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search nodes…"
+            className="mb-4"
           />
-        ))}
-      </div>
+
+          {groupedBuiltin.map(([label, descriptors]) => (
+            <div key={label} className="mb-5">
+              <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
+              <div className="flex flex-col gap-1.5">
+                {descriptors.map((descriptor) => (
+                  <NodeItem key={descriptor.type} descriptor={descriptor} />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
+            <button type="button" onClick={() => setIsRegistering(true)} className="text-muted hover:text-brand transition-colors">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {filteredCustom.map((descriptor) => (
+              <CustomNodeItem
+                key={descriptor.type}
+                descriptor={descriptor}
+                onDelete={(name) => unregisterNode.mutate(name)}
+                isDeleting={unregisterNode.isPending && unregisterNode.variables === descriptor.type}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {isRegistering && (
         <RegisterNodeDialog workspaceId={workspaceId} onClose={() => setIsRegistering(false)} />

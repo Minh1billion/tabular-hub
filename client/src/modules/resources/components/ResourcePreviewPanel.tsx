@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/shared/components/ui/Button'
 import { useDeleteResource, useResourcePreview } from '../hooks'
 
@@ -17,6 +17,11 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
   const { data: preview, isLoading } = useResourcePreview(workspaceId, activeKey ?? '', PAGE_SIZE, offset)
   const deleteResource = useDeleteResource(workspaceId)
 
+  useEffect(() => {
+    setConfirmingDelete(false)
+    setOffset(0)
+  }, [activeKey])
+
   if (!activeKey) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted">
@@ -32,11 +37,11 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
       setConfirmingDelete(true)
       return
     }
-    deleteResource.mutate(activeKey!, { onSuccess: onDeleted })
+    deleteResource.mutate(activeKey!, { onSuccess: onDeleted, onError: () => setConfirmingDelete(false) })
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0">
       <div className="h-12 flex items-center gap-3 px-5 border-b border-line bg-white shrink-0">
         <span className="font-mono text-sm text-ink truncate">{activeKey}</span>
         {preview && (
@@ -65,7 +70,7 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
             <thead>
               <tr className="sticky top-0 bg-cream-soft">
                 {columns.map((column) => (
-                  <th key={column} className="font-mono text-[10px] uppercase text-muted px-3 py-2 border-b border-line">
+                  <th key={column} className="font-mono text-[9px] uppercase text-muted px-2.5 py-1 border-b border-line">
                     {column}
                   </th>
                 ))}
@@ -75,7 +80,7 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
               {preview.rows.map((row, index) => (
                 <tr key={index} className="hover:bg-cream-soft">
                   {columns.map((column) => (
-                    <td key={column} className="text-[13px] text-slate px-3 py-2 border-b border-line whitespace-nowrap">
+                    <td key={column} className="text-[12px] text-slate px-2.5 py-1 border-b border-line max-w-[240px] truncate">
                       {String(row[column])}
                     </td>
                   ))}
@@ -91,7 +96,7 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
       </div>
 
       {preview && preview.row_count > PAGE_SIZE && (
-        <div className="h-12 flex items-center justify-center gap-3 border-t border-line bg-white shrink-0">
+        <div className="h-10 flex items-center justify-center gap-3 border-t border-line bg-white shrink-0">
           <Button
             type="button"
             variant="outline"

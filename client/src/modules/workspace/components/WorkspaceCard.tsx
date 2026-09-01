@@ -29,7 +29,12 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
   const navigate = useNavigate()
 
   return (
-    <Card ref={ref} highlighted={isHighlighted} className="cursor-pointer" onClick={() => navigate(`/workspaces/${workspace.id}`)}>
+    <Card
+      ref={ref}
+      highlighted={isHighlighted}
+      className="cursor-pointer border-2 !border-black"
+      onClick={() => navigate(`/workspaces/${workspace.id}`)}
+    >
       <div className="flex items-start justify-between mb-3.5">
         <div className="w-[34px] h-[34px] rounded-[9px] bg-brand-tint flex items-center justify-center">
           <svg className="w-4 h-4 text-[#0f6e4c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

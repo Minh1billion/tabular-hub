@@ -22,12 +22,12 @@ export function PipelineNode({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative min-w-[168px] bg-white border rounded-card px-3.5 py-3 transition-colors',
+        'relative min-w-[168px] bg-white border-2 rounded-card px-3.5 py-3 transition-colors',
         hasError
           ? 'border-warn shadow-[0_0_0_1.5px_var(--warn)]'
           : selected
             ? 'border-brand shadow-[0_0_0_1.5px_var(--brand)]'
-            : 'border-line',
+            : 'border-black',
       )}
     >
       {inPorts.length === 2 ? (

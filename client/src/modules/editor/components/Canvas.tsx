@@ -266,7 +266,7 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
           fitView
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} />
+          <Background variant={BackgroundVariant.Lines} gap={24} size={1} color="var(--line)" />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable />
         </ReactFlow>
@@ -275,17 +275,18 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
             Drag a node from the library to get started.
           </div>
         )}
-      </div>
 
-      {selectedGraphNode && (
-        <NodeInspector
-          workspaceId={workspaceId}
-          node={selectedGraphNode}
-          descriptor={descriptors.get(selectedGraphNode.type)}
-          onChange={updateSelectedParams}
-          onClose={closeInspector}
-        />
-      )}
+        {selectedGraphNode && (
+          <NodeInspector
+            key={selectedGraphNode.id}
+            workspaceId={workspaceId}
+            node={selectedGraphNode}
+            descriptor={descriptors.get(selectedGraphNode.type)}
+            onChange={updateSelectedParams}
+            onClose={closeInspector}
+          />
+        )}
+      </div>
 
       {contextMenu?.type === 'node' && (
         <ContextMenu

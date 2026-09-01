@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useRef, useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
 import { NodeDescriptor } from '@/modules/editor/types'
 import { useResources } from '@/modules/resources/hooks'
@@ -105,6 +105,30 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
   const { data: resources } = useResources(workspaceId)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const dragging = useRef(false)
+
+  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    dragging.current = true
+    const startX = event.clientX
+    const startY = event.clientY
+    const start = offset
+
+    function onMove(moveEvent: PointerEvent) {
+      if (!dragging.current) return
+      setOffset({ x: start.x + (moveEvent.clientX - startX), y: start.y + (moveEvent.clientY - startY) })
+    }
+
+    function onUp() {
+      dragging.current = false
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   function setParam(fieldName: string, value: unknown) {
     onChange({ ...node.params, [fieldName]: value })
@@ -159,8 +183,14 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
   }
 
   return (
-    <div className="w-[260px] bg-white border-l border-line flex flex-col p-4 overflow-auto">
-      <div className="flex items-center justify-between mb-3">
+    <div
+      className="absolute top-4 right-4 z-20 w-[260px] max-h-[calc(100%-32px)] bg-white border-2 border-black rounded-panel flex flex-col overflow-hidden shadow-lg"
+      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+    >
+      <div
+        onPointerDown={startDrag}
+        className="flex items-center justify-between px-4 py-3 border-b-2 border-black cursor-grab active:cursor-grabbing shrink-0"
+      >
         <h2 className="font-headline font-semibold text-sm truncate">{node.name}</h2>
         <button type="button" onClick={onClose} className="text-muted hover:text-ink transition-colors shrink-0">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -169,19 +199,21 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
         </button>
       </div>
 
-      <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-3">{node.type}</div>
+      <div className="p-4 overflow-auto">
+        <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-3">{node.type}</div>
 
-      {!descriptor ? (
-        <p className="text-[12px] text-muted">Unknown node type.</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {Object.entries(descriptor.required).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
-          {Object.entries(descriptor.optional).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
-          {Object.keys(descriptor.required).length === 0 && Object.keys(descriptor.optional).length === 0 && (
-            <p className="text-[12px] text-muted">No params for this node.</p>
-          )}
-        </div>
-      )}
+        {!descriptor ? (
+          <p className="text-[12px] text-muted">Unknown node type.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {Object.entries(descriptor.required).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
+            {Object.entries(descriptor.optional).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
+            {Object.keys(descriptor.required).length === 0 && Object.keys(descriptor.optional).length === 0 && (
+              <p className="text-[12px] text-muted">No params for this node.</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
