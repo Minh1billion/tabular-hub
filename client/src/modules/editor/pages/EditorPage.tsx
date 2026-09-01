@@ -173,7 +173,14 @@ export function EditorPage() {
           Run History
         </Link>
         <div className="flex-1" />
-        <Button type="button" variant="primary" size="sm" onClick={handleRun} disabled={createRun.isPending}>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={handleRun}
+          disabled={createRun.isPending}
+          className="border-[1.5px] border-black"
+        >
           Run
         </Button>
         <span className="font-mono text-[11px] text-muted">

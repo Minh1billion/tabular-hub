@@ -25,7 +25,7 @@ export function CreateWorkspaceCard({ isOpen, onOpen, onCancel, onSubmit, isSubm
     return (
       <form
         onSubmit={handleSubmit}
-        className="bg-white border-2 border-black rounded-card p-[18px] flex flex-col gap-3 min-h-[150px] justify-center"
+        className="bg-white border-2 border-black rounded-card p-[18px] flex flex-col gap-3 min-h-[180px] justify-center"
       >
         <label className="text-xs font-mono text-muted">WORKSPACE NAME</label>
         <Input
@@ -51,7 +51,7 @@ export function CreateWorkspaceCard({ isOpen, onOpen, onCancel, onSubmit, isSubm
     <button
       type="button"
       onClick={onOpen}
-      className="bg-cream-soft border-2 border-dashed border-black rounded-card p-[18px] flex flex-col items-start justify-center gap-2.5 min-h-[150px] text-left transition-colors hover:border-brand"
+      className="bg-cream-soft border-2 border-dashed border-black rounded-card p-[18px] flex flex-col items-start justify-center gap-2.5 min-h-[180px] text-left transition-colors hover:border-brand"
     >
       <div className="w-[34px] h-[34px] rounded-[9px] bg-white border border-line flex items-center justify-center">
         <svg className="w-4 h-4 text-slate" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

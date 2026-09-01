@@ -33,6 +33,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
   const [internalTabId, setInternalTabId] = useState(tabs[0]?.id)
   const activeTabId = controlledTabId ?? internalTabId
   const resizing = useRef(false)
+  const [isResizing, setIsResizing] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_OPEN, String(isOpen))
@@ -50,6 +51,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault()
     resizing.current = true
+    setIsResizing(true)
     const startY = event.clientY
     const startHeight = height
 
@@ -61,6 +63,7 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
 
     function onUp() {
       resizing.current = false
+      setIsResizing(false)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
@@ -109,18 +112,23 @@ export function BottomPanel({ tabs, defaultOpen = false, activeTabId: controlled
         </button>
       </div>
 
-      {isOpen && (
-        <div className="flex flex-col border-t-2 border-black" style={{ height }}>
-          <div onPointerDown={startResize} className="h-1 shrink-0 cursor-row-resize hover:bg-brand/40" />
-          <div className="flex-1 min-h-0 overflow-auto">
-            {tabs.map((tab) => (
-              <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
-                {tab.content}
-              </div>
-            ))}
-          </div>
+      <div
+        className={cn(
+          'flex flex-col overflow-hidden',
+          isOpen && 'border-t-2 border-black',
+          !isResizing && 'transition-[height] duration-300 ease-in-out',
+        )}
+        style={{ height: isOpen ? height : 0 }}
+      >
+        <div onPointerDown={startResize} className="h-1 shrink-0 cursor-row-resize hover:bg-brand/40" />
+        <div className="flex-1 min-h-0 overflow-auto">
+          {tabs.map((tab) => (
+            <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
+              {tab.content}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   )
 }

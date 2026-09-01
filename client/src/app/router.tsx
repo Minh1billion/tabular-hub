@@ -1,10 +1,11 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import { AuthLayout } from './layouts/AuthLayout'
 import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from '@/modules/auth/pages/LoginPage'
 import { WorkspaceListPage } from '@/modules/workspace/pages/WorkspaceListPage'
 import { EditorPage } from '@/modules/editor/pages/EditorPage'
 import { RunHistoryPage } from '@/modules/runs/pages/RunHistoryPage'
+import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 export const router = createBrowserRouter([
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
   {
     element: <AppLayout />,
     children: [
+      { path: '/', element: <HomePage /> },
       { path: '/workspaces', element: <WorkspaceListPage /> },
       { path: '/workspaces/:id', element: <EditorPage /> },
       { path: '/workspaces/:workspaceId/runs', element: <RunHistoryPage /> },
@@ -22,5 +24,4 @@ export const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
-  { path: '/', element: <Navigate to="/workspaces" replace /> },
 ])

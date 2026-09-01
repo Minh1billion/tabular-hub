@@ -106,12 +106,19 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
   return (
     <div
       className={cn(
-        'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden',
+        'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
         isOpen ? 'w-[240px]' : 'w-[52px]',
       )}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b-2 border-black shrink-0">
-        {isOpen && <h2 className="font-headline font-semibold text-sm">Node library</h2>}
+        <h2
+          className={cn(
+            'font-headline font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
+            isOpen ? 'max-w-[180px] opacity-100' : 'max-w-0 opacity-0',
+          )}
+        >
+          Node library
+        </h2>
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
@@ -129,47 +136,50 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
         </button>
       </div>
 
-      {isOpen && (
-        <div className="flex-1 min-h-0 overflow-auto p-4">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search nodes…"
-            className="mb-4"
-          />
+      <div
+        className={cn(
+          'w-[240px] shrink-0 flex-1 min-h-0 overflow-auto p-4 transition-opacity duration-200 ease-in-out',
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        )}
+      >
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search nodes…"
+          className="mb-4"
+        />
 
-          {groupedBuiltin.map(([label, descriptors]) => (
-            <div key={label} className="mb-5">
-              <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
-              <div className="flex flex-col gap-1.5">
-                {descriptors.map((descriptor) => (
-                  <NodeItem key={descriptor.type} descriptor={descriptor} />
-                ))}
-              </div>
+        {groupedBuiltin.map(([label, descriptors]) => (
+          <div key={label} className="mb-5">
+            <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-2">{label}</div>
+            <div className="flex flex-col gap-1.5">
+              {descriptors.map((descriptor) => (
+                <NodeItem key={descriptor.type} descriptor={descriptor} />
+              ))}
             </div>
-          ))}
-
-          <div className="flex items-center justify-between mb-2">
-            <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
-            <button type="button" onClick={() => setIsRegistering(true)} className="text-muted hover:text-brand transition-colors">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
           </div>
+        ))}
 
-          <div className="flex flex-col gap-1.5">
-            {filteredCustom.map((descriptor) => (
-              <CustomNodeItem
-                key={descriptor.type}
-                descriptor={descriptor}
-                onDelete={(name) => unregisterNode.mutate(name)}
-                isDeleting={unregisterNode.isPending && unregisterNode.variables === descriptor.type}
-              />
-            ))}
-          </div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-mono text-[10px] tracking-wide text-muted uppercase">Custom</div>
+          <button type="button" onClick={() => setIsRegistering(true)} className="text-muted hover:text-brand transition-colors">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
         </div>
-      )}
+
+        <div className="flex flex-col gap-1.5">
+          {filteredCustom.map((descriptor) => (
+            <CustomNodeItem
+              key={descriptor.type}
+              descriptor={descriptor}
+              onDelete={(name) => unregisterNode.mutate(name)}
+              isDeleting={unregisterNode.isPending && unregisterNode.variables === descriptor.type}
+            />
+          ))}
+        </div>
+      </div>
 
       {isRegistering && (
         <RegisterNodeDialog workspaceId={workspaceId} onClose={() => setIsRegistering(false)} />
