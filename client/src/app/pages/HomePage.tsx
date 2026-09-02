@@ -76,7 +76,7 @@ function StepCard({ index, title, description }: { index: string; title: string;
 
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
-    <Card className="hover:border-line">
+    <Card className="border-[1.5px] !border-black hover:border-black">
       <h3 className="font-headline font-semibold text-[14.5px] text-ink mb-1.5">{title}</h3>
       <p className="text-[13px] text-slate leading-relaxed">{description}</p>
     </Card>
@@ -171,7 +171,7 @@ export function HomePage() {
             <div className="flex flex-wrap items-center gap-3 mb-10">
               <Link
                 to={primaryHref}
-                className="inline-flex items-center justify-center px-5 py-3 rounded-xl text-sm font-medium bg-brand text-white hover:bg-brand-hover transition-colors active:scale-[0.98]"
+                className="inline-flex items-center justify-center px-5 py-3 rounded-xl text-sm font-medium bg-brand text-white border-[1.5px] border-black hover:bg-brand-hover transition-colors active:scale-[0.98]"
               >
                 {primaryLabel}
               </Link>

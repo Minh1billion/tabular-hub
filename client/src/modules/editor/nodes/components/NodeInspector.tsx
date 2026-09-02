@@ -9,6 +9,7 @@ interface NodeInspectorProps {
   node: GraphNode
   descriptor?: NodeDescriptor
   onChange: (params: Record<string, unknown>) => void
+  onRename: (name: string) => void
   onClose: () => void
 }
 
@@ -100,13 +101,22 @@ function ParamField({
   )
 }
 
-export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose }: NodeInspectorProps) {
+export function NodeInspector({ workspaceId, node, descriptor, onChange, onRename, onClose }: NodeInspectorProps) {
   const usesResourceKeyDropdown = RESOURCE_KEY_DROPDOWN_NODE_TYPES.has(node.type)
   const { data: resources } = useResources(workspaceId)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(node.name)
   const dragging = useRef(false)
+
+  function submitRename() {
+    const trimmed = nameDraft.trim()
+    setIsEditingName(false)
+    if (trimmed && trimmed !== node.name) onRename(trimmed)
+    else setNameDraft(node.name)
+  }
 
   function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -191,7 +201,34 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onClose
         onPointerDown={startDrag}
         className="flex items-center justify-between px-4 py-3 border-b-2 border-black cursor-grab active:cursor-grabbing shrink-0"
       >
-        <h2 className="font-headline font-semibold text-sm truncate">{node.name}</h2>
+        {isEditingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onPointerDown={(event) => event.stopPropagation()}
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={submitRename}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') submitRename()
+              if (event.key === 'Escape') {
+                setNameDraft(node.name)
+                setIsEditingName(false)
+              }
+            }}
+            className="font-headline font-semibold text-sm bg-transparent outline-none border-b border-brand"
+          />
+        ) : (
+          <h2
+            className="font-headline font-semibold text-sm truncate min-w-0 cursor-text hover:text-brand hover:underline transition-colors"
+            onPointerDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => {
+              event.stopPropagation()
+              setIsEditingName(true)
+            }}
+          >
+            {node.name}
+          </h2>
+        )}
         <button type="button" onClick={onClose} className="text-muted hover:text-ink transition-colors shrink-0">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 6 18 18M6 18 18 6" />

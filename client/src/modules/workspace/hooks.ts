@@ -43,6 +43,18 @@ export function useUpdateWorkspace(workspaceId: string) {
   })
 }
 
+export function useRenameWorkspace() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => updateWorkspace(id, { name }),
+    onSuccess: (workspace) => {
+      queryClient.setQueryData(workspaceQueryKey(workspace.id), workspace)
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
+    },
+  })
+}
+
 export function useDeleteWorkspace() {
   const queryClient = useQueryClient()
 

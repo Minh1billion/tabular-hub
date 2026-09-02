@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCurrentUser } from '@/modules/auth/hooks'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
-import { useCreateWorkspace, useDeleteWorkspace, useWorkspaces } from '../hooks'
+import { useCreateWorkspace, useDeleteWorkspace, useRenameWorkspace, useWorkspaces } from '../hooks'
 import { WorkspaceListPanel } from '../components/WorkspaceListPanel'
 import { WorkspaceCard } from '../components/WorkspaceCard'
 import { CreateWorkspaceCard } from '../components/CreateWorkspaceCard'
@@ -12,6 +12,7 @@ export function WorkspaceListPage() {
   const { data: workspaces = [], isLoading } = useWorkspaces()
   const createWorkspace = useCreateWorkspace()
   const deleteWorkspace = useDeleteWorkspace()
+  const renameWorkspace = useRenameWorkspace()
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
@@ -76,6 +77,7 @@ export function WorkspaceListPage() {
                 ownerName={ownerName}
                 isPersonal={workspace.owner_id === user?.id && workspaces.length === 1}
                 onDelete={(id) => deleteWorkspace.mutate(id)}
+                onRename={(id, name) => renameWorkspace.mutate({ id, name })}
                 isDeleting={deleteWorkspace.isPending && deleteWorkspace.variables === workspace.id}
                 isHighlighted={highlightedId === workspace.id}
               />

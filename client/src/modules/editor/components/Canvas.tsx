@@ -31,7 +31,7 @@ function edgeId(connection: GraphConnection) {
   return [connection.from, connection.to, connection.on, connection.into].filter(Boolean).join(':')
 }
 
-function toFlowNodes(nodes: GraphNode[], descriptors: Map<string, NodeDescriptor>): Node[] {
+function toFlowNodes(nodes: GraphNode[], descriptors: Map<string, NodeDescriptor>, onRename: (id: string, name: string) => void): Node[] {
   return nodes.map((node) => ({
     id: node.id,
     type: 'pipeline',
@@ -41,6 +41,7 @@ function toFlowNodes(nodes: GraphNode[], descriptors: Map<string, NodeDescriptor
       nodeType: node.type,
       params: node.params,
       descriptor: descriptors.get(node.type),
+      onRename: (name: string) => onRename(node.id, name),
     } satisfies PipelineNodeData,
   }))
 }
@@ -94,7 +95,15 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
     return map
   }, [nodeLibrary])
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(spec.nodes, descriptors))
+  const setNodesRef = useRef<React.Dispatch<React.SetStateAction<Node[]>>>(() => {})
+  function renameNode(id: string, name: string) {
+    setNodesRef.current((current) =>
+      current.map((node) => (node.id === id ? { ...node, data: { ...node.data, label: name } } : node)),
+    )
+  }
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(spec.nodes, descriptors, renameNode))
+  setNodesRef.current = setNodes
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections))
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
@@ -171,7 +180,13 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
           id,
           type: 'pipeline',
           position,
-          data: { label: nodeType, nodeType, params: {}, descriptor: descriptors.get(nodeType) } satisfies PipelineNodeData,
+          data: {
+            label: nodeType,
+            nodeType,
+            params: {},
+            descriptor: descriptors.get(nodeType),
+            onRename: (name: string) => renameNode(id, name),
+          } satisfies PipelineNodeData,
         },
       ])
     },
@@ -240,6 +255,10 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
     )
   }
 
+  function updateSelectedName(name: string) {
+    if (selectedNodeId) renameNode(selectedNodeId, name)
+  }
+
   return (
     <div className="w-full h-full flex">
       <div
@@ -259,9 +278,12 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
             reactFlowInstance.current = instance
           }}
           onSelectionChange={({ nodes: selected }) => setSelectedNodeId(selected[0]?.id ?? null)}
+          onNodeClick={() => setContextMenu(null)}
+          onEdgeClick={() => setContextMenu(null)}
           onNodeContextMenu={onNodeContextMenu}
           onEdgeContextMenu={onEdgeContextMenu}
           onPaneContextMenu={onPaneContextMenu}
+          onPaneClick={() => setContextMenu(null)}
           nodeTypes={nodeTypes}
           fitView
           proOptions={{ hideAttribution: true }}
@@ -283,6 +305,7 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
             node={selectedGraphNode}
             descriptor={descriptors.get(selectedGraphNode.type)}
             onChange={updateSelectedParams}
+            onRename={updateSelectedName}
             onClose={closeInspector}
           />
         )}
@@ -293,7 +316,18 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          items={[{ label: 'Delete node', destructive: true, onClick: () => deleteNode(contextMenu.id) }]}
+          items={[
+            {
+              label: 'Rename node',
+              onClick: () =>
+                setNodes((current) =>
+                  current.map((node) =>
+                    node.id === contextMenu.id ? { ...node, data: { ...node.data, renameSignal: Date.now() } } : node,
+                  ),
+                ),
+            },
+            { label: 'Delete node', destructive: true, onClick: () => deleteNode(contextMenu.id) },
+          ]}
         />
       )}
 
