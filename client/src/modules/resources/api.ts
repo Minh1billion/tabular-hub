@@ -1,6 +1,8 @@
 import { apiClient } from '@/shared/lib/api-client'
 import { Run } from '@/modules/runs/types'
-import { ImportResourcePayload, ResourceListResponse, ResourcePreview } from './types'
+import { ExportResourcePayload, ImportResourcePayload, ResourceListResponse, ResourcePreview } from './types'
+
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export function listResources(workspaceId: string) {
   return apiClient.get<ResourceListResponse>(`/workspaces/${workspaceId}/resources`)
@@ -29,4 +31,15 @@ export function importResource(
   formData.append('file', payload.file)
 
   return apiClient.upload<Run>(`/workspaces/${workspaceId}/resources`, formData, onProgress)
+}
+
+export function exportResource(workspaceId: string, key: string, payload: ExportResourcePayload) {
+  return apiClient.post<Run>(`/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}/export`, {
+    format: payload.format,
+    idempotency_key: crypto.randomUUID(),
+  })
+}
+
+export function exportDownloadUrl(workspaceId: string, key: string, runId: string) {
+  return `${API_URL}/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}/export/${runId}/download`
 }

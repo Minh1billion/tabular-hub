@@ -16,6 +16,13 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
             bucket=bucket,
             overwrite=run.spec["overwrite"],
         )
+    if run.kind == "export":
+        return engine_lifecycle.engine.data_resource.export(
+            key=run.spec["key"],
+            dest_path=run.spec["path"],
+            format=run.spec["format"],
+            bucket=bucket,
+        )
     return engine_lifecycle.engine.execution.execute(
         spec=run.spec, bucket=bucket, cancel_check=lambda: is_cancel_requested(run_id)
     )
@@ -49,7 +56,6 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
             )
             db.commit()
             seq += 1
-            publish_event(str(run.id), event)
 
             if event["event"] == "compiled":
                 run.execution_id = event["data"]["execution_id"]
@@ -57,6 +63,8 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
             elif event["event"] in ("completed", "failed", "cancelled"):
                 run.status = event["event"]
                 db.commit()
+
+            publish_event(str(run.id), event)
 
         clear_cancel(run_id)
         engine_lifecycle.touch_bucket(str(run.workspace_id))

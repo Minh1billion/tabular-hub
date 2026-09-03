@@ -1,6 +1,9 @@
 import os
+import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 
 from tabular_manner.engine.bootstrap import Engine
@@ -9,7 +12,7 @@ from app.core.engine import get_engine
 from app.database import get_db
 from app.dependencies import get_owned_workspace
 from app.resources import service
-from app.resources.schemas import ResourceListResponse, ResourcePreviewResponse
+from app.resources.schemas import ExportResourceCreate, ResourceListResponse, ResourcePreviewResponse
 from app.run.schemas import RunRead
 from app.workspace.models import Workspace
 
@@ -58,3 +61,25 @@ def delete_resource(
     engine: Engine = Depends(get_engine),
 ):
     service.delete_resource(engine, str(workspace.id), key)
+
+@router.post("/{key}/export", response_model=RunRead, status_code=status.HTTP_202_ACCEPTED)
+def export_resource(
+    key: str,
+    payload: ExportResourceCreate,
+    workspace: Workspace = Depends(get_owned_workspace),
+    db: Session = Depends(get_db),
+):
+    return service.export_resource(
+        db, workspace=workspace, key=key, format=payload.format, idempotency_key=payload.idempotency_key
+    )
+
+@router.get("/{key}/export/{run_id}/download")
+def download_export(
+    key: str,
+    run_id: uuid.UUID,
+    workspace: Workspace = Depends(get_owned_workspace),
+    db: Session = Depends(get_db),
+):
+    run = service.get_export_run(db, workspace=workspace, run_id=run_id)
+    path = run.spec["path"]
+    return FileResponse(path, filename=f"{key}.{run.spec['format']}", background=BackgroundTask(os.remove, path))

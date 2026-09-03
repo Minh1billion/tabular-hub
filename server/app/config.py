@@ -34,5 +34,6 @@ class Settings(BaseSettings):
 
     MAX_UPLOAD_SIZE_BYTES: int = 5 * 1024 * 1024 * 1024
     UPLOAD_CHUNK_SIZE_BYTES: int = 1024 * 1024
+    EXPORT_TTL_SECONDS: int = 3600
 
 settings = Settings()

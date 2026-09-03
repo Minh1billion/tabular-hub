@@ -67,3 +67,55 @@ def test_resource_isolated_per_workspace(auth_client, workspace, other_workspace
     )
     other_listed = auth_client.get(f"/workspaces/{other_workspace['id']}/resources")
     assert "raw" not in other_listed.json()["keys"]
+
+def test_export_resource_enqueues_run(auth_client, workspace):
+    response = auth_client.post(
+        f"/workspaces/{workspace['id']}/resources/raw/export",
+        json={"format": "csv", "idempotency_key": "export-1"},
+    )
+    assert response.status_code == 202
+    body = response.json()
+    assert body["kind"] == "export"
+    assert body["status"] == "queued"
+
+    entries = queue_module._client.xrange("runs:pending")
+    assert len(entries) == 1
+    assert entries[0][1]["run_id"] == body["id"]
+
+def test_export_resource_full_flow(auth_client, workspace):
+    auth_client.post(
+        f"/workspaces/{workspace['id']}/resources",
+        data={"key": "raw", "format": "csv", "idempotency_key": "export-src"},
+        files={"file": ("raw.csv", _csv_file(), "text/csv")},
+    )
+    import_run_id = queue_module._client.xrange("runs:pending")[0][1]["run_id"]
+    from app.worker.processor import process_task
+    from app.core.engine import engine_lifecycle
+    process_task(engine_lifecycle, import_run_id)
+
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/resources/raw/export",
+        json={"format": "csv", "idempotency_key": "export-2"},
+    )
+    run_id = created.json()["id"]
+    process_task(engine_lifecycle, run_id)
+
+    response = auth_client.get(f"/workspaces/{workspace['id']}/resources/raw/export/{run_id}/download")
+    assert response.status_code == 200
+    assert response.content == b"a,b\n1,2\n3,4\n5,6\n"
+
+def test_download_export_before_completion_conflicts(auth_client, workspace):
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/resources/raw/export",
+        json={"format": "csv", "idempotency_key": "export-3"},
+    )
+    run_id = created.json()["id"]
+
+    response = auth_client.get(f"/workspaces/{workspace['id']}/resources/raw/export/{run_id}/download")
+    assert response.status_code == 409
+
+def test_download_export_unknown_run_not_found(auth_client, workspace):
+    response = auth_client.get(
+        f"/workspaces/{workspace['id']}/resources/raw/export/00000000-0000-0000-0000-000000000000/download"
+    )
+    assert response.status_code == 404

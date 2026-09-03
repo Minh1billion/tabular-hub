@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/shared/lib/cn'
 import { resourcesQueryKey, useDeleteResource, useResources } from '../hooks'
+import { ExportResourceDialog } from './ExportResourceDialog'
 import { ImportResourceDialog } from './ImportResourceDialog'
 
 interface ResourceSidebarListProps {
@@ -18,6 +19,7 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
   const deleteResource = useDeleteResource(workspaceId)
   const [isImporting, setIsImporting] = useState(false)
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
+  const [exportingKey, setExportingKey] = useState<string | null>(null)
 
   const keys = resources?.keys ?? []
 
@@ -102,6 +104,15 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
               </button>
               <button
                 type="button"
+                onClick={() => setExportingKey(key)}
+                className="shrink-0 text-muted hover:text-brand transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 16V4M7 9l5-5 5 5M5 20h14" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
                 onClick={() => handleDelete(key)}
                 disabled={deleteResource.isPending && confirmingKey === key}
                 className={cn(
@@ -129,6 +140,14 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
             queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
             setIsImporting(false)
           }}
+        />
+      )}
+
+      {exportingKey && (
+        <ExportResourceDialog
+          workspaceId={workspaceId}
+          resourceKey={exportingKey}
+          onClose={() => setExportingKey(null)}
         />
       )}
     </div>

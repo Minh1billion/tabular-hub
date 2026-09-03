@@ -8,6 +8,7 @@ from app.core.engine import engine_lifecycle
 from app.core.queue import ack, claim_idle_tasks, ensure_group, read_tasks
 from app.auth import models as auth_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
+from app.resources.service import sweep_expired_exports
 from app.worker.processor import process_task
 
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,7 @@ def run() -> None:
                 if ok:
                     ack(message_id)
             engine_lifecycle.evict_idle_buckets()
+            sweep_expired_exports()
     finally:
         engine_lifecycle.stop()
 

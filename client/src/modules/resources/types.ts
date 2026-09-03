@@ -17,3 +17,7 @@ export interface ImportResourcePayload {
   overwrite: boolean
   file: File
 }
+
+export interface ExportResourcePayload {
+  format: string
+}

@@ -111,6 +111,11 @@ async def stream_events(
     async def event_source():
         pubsub = await subscribe_run_events(str(run_id))
         try:
+            db.refresh(run)
+            if run.status in ("completed", "failed", "cancelled"):
+                yield f"data: {json.dumps({'event': run.status})}\n\n"
+                return
+
             while True:
                 if await request.is_disconnected():
                     break

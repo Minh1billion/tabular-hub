@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { deleteResource, importResource, listResources, previewResource } from './api'
-import { ImportResourcePayload } from './types'
+import { deleteResource, exportResource, importResource, listResources, previewResource } from './api'
+import { ExportResourcePayload, ImportResourcePayload } from './types'
 
 export const resourcesQueryKey = (workspaceId: string) => ['workspaces', workspaceId, 'resources'] as const
 export const resourcePreviewQueryKey = (workspaceId: string, key: string, limit: number, offset: number) =>
@@ -44,5 +44,11 @@ export function useDeleteResource(workspaceId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
     },
+  })
+}
+
+export function useExportResource(workspaceId: string, key: string) {
+  return useMutation({
+    mutationFn: (payload: ExportResourcePayload) => exportResource(workspaceId, key, payload),
   })
 }
