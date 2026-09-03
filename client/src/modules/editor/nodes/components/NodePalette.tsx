@@ -72,6 +72,7 @@ function groupByCategory(descriptors: NodeDescriptor[]) {
 interface NodePaletteProps {
   workspaceId: string
   nodeLibrary?: NodeLibrary
+  isOpen: boolean
 }
 
 function NodeItem({ descriptor, category }: { descriptor: NodeDescriptor; category: string }) {
@@ -135,8 +136,7 @@ function CustomNodeItem({
   )
 }
 
-export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
-  const [isOpen, setIsOpen] = useState(true)
+export function NodePalette({ workspaceId, nodeLibrary, isOpen }: NodePaletteProps) {
   const [isRegistering, setIsRegistering] = useState(false)
   const [search, setSearch] = useState('')
   const unregisterNode = useUnregisterNode(workspaceId)
@@ -160,43 +160,7 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
   )
 
   return (
-    <div
-      className={cn(
-        'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
-        isOpen ? 'w-[264px]' : 'w-[60px]',
-      )}
-    >
-      <div
-        className={cn(
-          'flex items-center px-4 py-3 border-b-2 border-black shrink-0',
-          isOpen ? 'justify-between' : 'justify-center',
-        )}
-      >
-        <h2
-          className={cn(
-            'font-headline font-semibold text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
-            isOpen ? 'max-w-[180px] opacity-100' : 'max-w-0 opacity-0',
-          )}
-        >
-          Node library
-        </h2>
-        <button
-          type="button"
-          onClick={() => setIsOpen((current) => !current)}
-          className="text-muted hover:text-ink transition-colors shrink-0"
-        >
-          <svg
-            className={cn('w-3.5 h-3.5 transition-transform', isOpen ? '' : 'rotate-180')}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </button>
-      </div>
-
+    <>
       <div
         className={cn(
           'thin-scrollbar flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-2 px-2.5 py-3 transition-opacity duration-200 ease-in-out',
@@ -274,6 +238,6 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
       {isRegistering && (
         <RegisterNodeDialog workspaceId={workspaceId} onClose={() => setIsRegistering(false)} />
       )}
-    </div>
+    </>
   )
 }

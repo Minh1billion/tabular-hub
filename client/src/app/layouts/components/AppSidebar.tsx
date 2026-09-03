@@ -1,57 +1,65 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
 
-const iconButtonClasses =
-  'w-9 h-9 flex items-center justify-center rounded-[9px] border-2 border-black transition-colors'
-
-function SidebarIcon({
-  to,
-  title,
-  active,
-  children,
-}: {
-  to: string
-  title: string
-  active: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      to={to}
-      title={title}
-      aria-label={title}
-      className={cn(
-        iconButtonClasses,
-        active ? 'bg-[#32664d] text-[#f5f5ef]' : 'bg-cream text-slate hover:bg-cream-soft',
-      )}
-    >
-      {children}
-    </Link>
-  )
-}
-
 export function AppSidebar() {
   const location = useLocation()
-  const isWorkspacesActive = location.pathname.startsWith('/workspaces')
   const isHomeActive = location.pathname === '/'
+  const isWorkspacesActive = location.pathname.startsWith('/workspaces')
+
+  const homeRef = useRef<HTMLAnchorElement>(null)
+  const workspacesRef = useRef<HTMLAnchorElement>(null)
+  const [highlightY, setHighlightY] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = isHomeActive ? homeRef.current : workspacesRef.current
+    if (el) setHighlightY(el.offsetTop)
+  }, [isHomeActive, isWorkspacesActive])
 
   return (
-    <nav className="w-14 bg-white border-r border-line flex flex-col items-center py-4 gap-1.5">
-      <SidebarIcon to="/" title="Home" active={isHomeActive}>
+    <nav className="relative w-14 bg-white border-r border-line flex flex-col items-center py-4 gap-1.5">
+      <div
+        className="absolute left-1/2 top-0 w-9 h-9 rounded-[9px] bg-[#32664d] transition-transform duration-300 ease-out"
+        style={{ transform: `translate(-50%, ${highlightY}px)` }}
+      />
+
+      <Link
+        ref={homeRef}
+        to="/"
+        title="Home"
+        aria-label="Home"
+        className={cn(
+          'relative z-10 w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
+          isHomeActive
+            ? 'border-2 border-black bg-[#32664d] text-[#f5f5ef]'
+            : 'border-[1.5px] border-[#ddddc4] text-slate hover:bg-cream-soft',
+        )}
+      >
         <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M4 11.5 12 4l8 7.5" />
           <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" />
         </svg>
-      </SidebarIcon>
+      </Link>
 
       <div className="w-6 h-px bg-line my-0.5" />
 
-      <SidebarIcon to="/workspaces" title="Workspaces" active={isWorkspacesActive}>
+      <Link
+        ref={workspacesRef}
+        to="/workspaces"
+        title="Workspaces"
+        aria-label="Workspaces"
+        className={cn(
+          'relative z-10 w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
+          isWorkspacesActive
+            ? 'border-2 border-black bg-[#32664d] text-[#f5f5ef]'
+            : 'border-[1.5px] border-[#ddddc4] text-slate hover:bg-cream-soft',
+        )}
+      >
         <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <rect x="4" y="4" width="16" height="16" rx="2" />
           <path d="M4 10h16M10 10v10" />
         </svg>
-      </SidebarIcon>
+      </Link>
     </nav>
   )
 }

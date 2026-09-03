@@ -31,11 +31,17 @@ function edgeId(connection: GraphConnection) {
   return [connection.from, connection.to, connection.on, connection.into].filter(Boolean).join(':')
 }
 
-function toFlowNodes(nodes: GraphNode[], descriptors: Map<string, NodeDescriptor>, onRename: (id: string, name: string) => void): Node[] {
+function toFlowNodes(
+  nodes: GraphNode[],
+  descriptors: Map<string, NodeDescriptor>,
+  onRename: (id: string, name: string) => void,
+  selectedNodeId: string | null,
+): Node[] {
   return nodes.map((node) => ({
     id: node.id,
     type: 'pipeline',
     position: node.position,
+    selected: node.id === selectedNodeId,
     data: {
       label: node.name,
       nodeType: node.type,
@@ -102,13 +108,22 @@ export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNode
     )
   }
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(spec.nodes, descriptors, renameNode))
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+    toFlowNodes(spec.nodes, descriptors, renameNode, localStorage.getItem(`canvas.selectedNodeId:${workspaceId}`)),
+  )
   setNodesRef.current = setNodes
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections))
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
+    () => localStorage.getItem(`canvas.selectedNodeId:${workspaceId}`),
+  )
   const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (selectedNodeId) localStorage.setItem(`canvas.selectedNodeId:${workspaceId}`, selectedNodeId)
+    else localStorage.removeItem(`canvas.selectedNodeId:${workspaceId}`)
+  }, [workspaceId, selectedNodeId])
 
   useEffect(() => {
     setNodes((current) =>

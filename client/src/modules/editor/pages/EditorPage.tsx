@@ -1,54 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Button } from '@/shared/components/ui/Button'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
 import { useNodeLibrary } from '@/modules/editor/nodes/hooks'
-import { NodePalette } from '@/modules/editor/nodes/components/NodePalette'
-import { resourcesQueryKey, useResources } from '@/modules/resources/hooks'
-import { ResourceListPanel } from '@/modules/resources/components/ResourceListPanel'
-import { ResourcePreviewPanel } from '@/modules/resources/components/ResourcePreviewPanel'
-import { ImportResourceDialog } from '@/modules/resources/components/ImportResourceDialog'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
 import { ValidateResponse } from '@/modules/runs/types'
 import { RunPanel } from '@/modules/runs/components/RunPanel'
 import { GraphSpec } from '../types'
 import { Canvas } from '../components/Canvas'
 import { BottomPanel } from '../components/BottomPanel'
+import { ToolSidebar } from '../components/ToolSidebar'
 
 function emptySpec(name: string): GraphSpec {
   return { name, nodes: [], connections: [] }
-}
-
-function ResourcesTab({ workspaceId }: { workspaceId: string }) {
-  const queryClient = useQueryClient()
-  const { data: resources, isLoading } = useResources(workspaceId)
-  const [activeKey, setActiveKey] = useState<string | null>(null)
-  const [isImporting, setIsImporting] = useState(false)
-
-  return (
-    <div className="h-full flex">
-      <ResourceListPanel
-        keys={resources?.keys ?? []}
-        activeKey={activeKey}
-        onSelect={setActiveKey}
-        onImportClick={() => setIsImporting(true)}
-        isLoading={isLoading}
-      />
-      <ResourcePreviewPanel workspaceId={workspaceId} activeKey={activeKey} onDeleted={() => setActiveKey(null)} />
-
-      {isImporting && (
-        <ImportResourceDialog
-          workspaceId={workspaceId}
-          onClose={() => setIsImporting(false)}
-          onImported={() => {
-            queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
-          }}
-        />
-      )}
-    </div>
-  )
 }
 
 function shortErrorMessage(error: string) {
@@ -189,7 +154,7 @@ export function EditorPage() {
       </div>
 
       <div className="flex-1 min-h-0 flex">
-        <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
+        <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         <Canvas
           workspaceId={workspaceId}
           spec={spec}
@@ -224,11 +189,6 @@ export function EditorPage() {
                 onFocusNode={(nodeId) => setFocusNodeId(nodeId)}
               />
             ),
-          },
-          {
-            id: 'resources',
-            label: 'Resources',
-            content: <ResourcesTab workspaceId={workspaceId} />,
           },
           {
             id: 'run',
