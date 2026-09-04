@@ -43,5 +43,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     RUN_QUEUE_STREAM: str = "runs:pending"
 
+    STRIPE_SECRET_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
+    STRIPE_PUBLISHABLE_KEY: str
+    STRIPE_PRICE_ID_PRO: str
+    STRIPE_PRICE_ID_TEAM: str
+
 
 settings = Settings()

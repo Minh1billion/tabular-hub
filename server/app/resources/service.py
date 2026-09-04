@@ -1,13 +1,17 @@
 import uuid
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from tabular_manner.engine.bootstrap import Engine
 
+from app.billing import service as billing_service
 from app.core import staging
 from app.core.engine import drain_events
+from app.core.exceptions import PayloadTooLargeError
 from app.core.queue import enqueue_run
+from app.resources.models import ResourceUsage
 from app.run import service as run_service
 from app.run.models import Run
 from app.workspace.models import Workspace
@@ -33,6 +37,25 @@ def confirm_upload(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> R
         raise HTTPException(status_code=404, detail="Import run not found")
     if not staging.exists(run.spec["staging_key"]):
         raise HTTPException(status_code=400, detail="Upload not found in staging")
+
+    limits = billing_service.get_plan_limits(db, workspace.owner_id)
+    upload_size = staging.size(run.spec["staging_key"])
+    if upload_size > limits["max_resource_size_bytes"]:
+        staging.delete(run.spec["staging_key"])
+        raise PayloadTooLargeError(f"File exceeds plan limit of {limits['max_resource_size_bytes']} bytes")
+
+    current_usage = (
+        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
+        .filter(ResourceUsage.workspace_id == workspace.id)
+        .scalar()
+    )
+    if current_usage + upload_size > limits["max_total_storage_bytes"]:
+        staging.delete(run.spec["staging_key"])
+        raise PayloadTooLargeError(f"Workspace storage limit of {limits['max_total_storage_bytes']} bytes exceeded")
+
+    run.spec = {**run.spec, "size_bytes": upload_size}
+    db.commit()
+
     run = run_service.mark_queued(db, run=run)
     enqueue_run(str(run.id))
     return run
@@ -49,10 +72,12 @@ def preview_resource(engine: Engine, bucket: str, key: str, limit: int, offset: 
         raise HTTPException(status_code=404, detail=result["error"])
     return result["data"]
 
-def delete_resource(engine: Engine, bucket: str, key: str) -> None:
+def delete_resource(db: Session, engine: Engine, bucket: str, key: str) -> None:
     result = drain_events(engine.data_resource.delete(key, bucket=bucket))
     if result["event"] == "failed":
         raise HTTPException(status_code=404, detail=result["error"])
+    db.query(ResourceUsage).filter(ResourceUsage.workspace_id == bucket, ResourceUsage.key == key).delete()
+    db.commit()
 
 def export_resource(db: Session, *, workspace: Workspace, key: str, format: str, idempotency_key: str) -> Run:
     staging_key = staging.new_key(str(workspace.id), f"{key}.{format}")

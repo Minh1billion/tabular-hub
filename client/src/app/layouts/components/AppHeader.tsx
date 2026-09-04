@@ -1,9 +1,10 @@
 import { PropsWithChildren, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import logo from '@/assets/logo.svg'
 import { Avatar } from '@/shared/components/ui/Avatar'
 import { useCurrentUser, useLogout } from '@/modules/auth/hooks'
 import { useWorkspaces } from '@/modules/workspace/hooks'
+import { useSubscription } from '@/modules/billing/hooks'
 import { cn } from '@/shared/lib/cn'
 
 const ENGINE_REPO_URL = 'https://github.com/Minh1billion/tabular-manner'
@@ -41,6 +42,7 @@ function IconLink({
 export function AppHeader() {
   const { data: user } = useCurrentUser()
   const { data: workspaces = [] } = useWorkspaces()
+  const { data: subscription } = useSubscription()
   const logout = useLogout()
   const navigate = useNavigate()
   const { id: activeWorkspaceId } = useParams<{ id: string }>()
@@ -113,9 +115,12 @@ export function AppHeader() {
           )}
         </div>
 
-        <span className="font-mono text-[10.5px] px-2 py-0.5 rounded-full bg-brand-tint text-[#0f6e4c] tracking-wide">
-          Free
-        </span>
+        <Link
+          to="/billing"
+          className="font-mono text-[10.5px] px-2 py-0.5 rounded-full bg-brand-tint text-[#0f6e4c] tracking-wide capitalize hover:bg-[#c9e8d6] transition-colors"
+        >
+          {subscription?.tier ?? 'free'}
+        </Link>
       </div>
 
       <div className="flex-1" />

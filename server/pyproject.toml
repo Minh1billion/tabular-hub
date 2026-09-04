@@ -17,6 +17,7 @@ dependencies = [
     "redis",
     "python-multipart",
     "boto3",
+    "stripe",
     "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@11d1148aa1e3552985e4d4a1ccf0b110eb1b9298",
 ]
 

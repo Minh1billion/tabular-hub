@@ -10,6 +10,8 @@ from app.core.queue import ack, claim_idle_tasks, ensure_group, read_tasks
 from app.database import SessionLocal
 from app.run.service import fail_stale_pending_uploads
 from app.auth import models as auth_models  # noqa: F401
+from app.billing import models as billing_models  # noqa: F401
+from app.resources import models as resources_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
 from app.worker.processor import process_task
 

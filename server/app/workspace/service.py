@@ -5,11 +5,22 @@ from typing import Any
 from sqlalchemy.orm import Session
 from tabular_manner.engine.bootstrap import Engine
 
+from app.billing import service as billing_service
 from app.core.engine import drain_events
-from app.core.exceptions import AppError, ForbiddenError, NotFoundError
+from app.core.exceptions import AppError, ForbiddenError, NotFoundError, PlanLimitExceededError
+from app.resources.models import ResourceUsage
 from app.workspace.models import Workspace
 
 def create_workspace(db: Session, *, owner_id: uuid.UUID, name: str) -> Workspace:
+    limits = billing_service.get_plan_limits(db, owner_id)
+    workspace_count = (
+        db.query(Workspace)
+        .filter(Workspace.owner_id == owner_id, Workspace.deleted_at.is_(None))
+        .count()
+    )
+    if workspace_count >= limits["max_workspaces"]:
+        raise PlanLimitExceededError(f"Workspace limit reached ({limits['max_workspaces']})")
+
     workspace = Workspace(name=name, owner_id=owner_id)
     db.add(workspace)
     db.commit()
@@ -77,5 +88,6 @@ def delete_workspace(db: Session, *, owner_id: uuid.UUID, workspace_id: uuid.UUI
         if result["event"] == "failed":
             raise AppError(f"Failed to remove custom node '{definition['name']}': {result['error']}")
 
+    db.query(ResourceUsage).filter(ResourceUsage.workspace_id == workspace.id).delete()
     workspace.deleted_at = datetime.now(timezone.utc)
     db.commit()

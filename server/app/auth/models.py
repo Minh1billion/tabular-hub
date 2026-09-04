@@ -17,6 +17,9 @@ class User(Base, UUIDPKMixin, TimestampMixin):
     workspaces = relationship(
         "Workspace", back_populates="owner", cascade="all, delete-orphan"
     )
+    subscription = relationship(
+        "Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
 class OAuthAccount(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "oauth_accounts"

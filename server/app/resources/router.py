@@ -65,9 +65,10 @@ def preview_resource(
 def delete_resource(
     key: str,
     workspace: Workspace = Depends(get_owned_workspace),
+    db: Session = Depends(get_db),
     engine: Engine = Depends(get_engine),
 ):
-    service.delete_resource(engine, str(workspace.id), key)
+    service.delete_resource(db, engine, str(workspace.id), key)
 
 @router.post("/{key}/export", response_model=RunRead, status_code=status.HTTP_202_ACCEPTED)
 def export_resource(

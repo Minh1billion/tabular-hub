@@ -4,6 +4,7 @@ from app.core import staging
 from app.core.engine import EngineLifecycle
 from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
+from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
 
 def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
@@ -63,6 +64,16 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
                 db.commit()
             elif event["event"] in ("completed", "failed", "cancelled"):
                 run.status = event["event"]
+                if event["event"] == "completed" and run.kind == "import":
+                    usage = (
+                        db.query(ResourceUsage)
+                        .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
+                        .first()
+                    )
+                    if usage:
+                        usage.size_bytes = run.spec["size_bytes"]
+                    else:
+                        db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
                 db.commit()
 
             publish_event(str(run.id), event)

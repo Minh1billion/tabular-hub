@@ -23,6 +23,9 @@ class ConflictError(AppError):
 class PayloadTooLargeError(AppError):
     status_code = 413
 
+class PlanLimitExceededError(AppError):
+    status_code = 402
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError):

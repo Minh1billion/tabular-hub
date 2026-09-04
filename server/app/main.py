@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth.router import router as auth_router
+from app.billing.router import router as billing_router
 from app.nodes.router import router as nodes_router
 from app.resources.router import router as resources_router
 from app.run.router import router as run_router
@@ -25,6 +26,7 @@ app.add_middleware(
 register_exception_handlers(app)
 
 app.include_router(auth_router)
+app.include_router(billing_router)
 app.include_router(workspace_router)
 app.include_router(run_router)
 app.include_router(nodes_router)

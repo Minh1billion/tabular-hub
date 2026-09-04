@@ -55,6 +55,10 @@ def exists(key: str) -> bool:
     except ClientError:
         return False
 
+def size(key: str) -> int:
+    head = _client.head_object(Bucket=settings.STAGING_S3_BUCKET_NAME, Key=key)
+    return head["ContentLength"]
+
 def s3_reader_params(key: str) -> dict:
     return {
         "bucket_name": settings.STAGING_S3_BUCKET_NAME,
