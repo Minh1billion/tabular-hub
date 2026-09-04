@@ -8,11 +8,12 @@ import { Plan } from '../types'
 interface PlanCardProps {
   plan: Plan
   isCurrent: boolean
+  isDowngrade: boolean
   onUpgrade: () => void
   isUpgrading: boolean
 }
 
-export function PlanCard({ plan, isCurrent, onUpgrade, isUpgrading }: PlanCardProps) {
+export function PlanCard({ plan, isCurrent, isDowngrade, onUpgrade, isUpgrading }: PlanCardProps) {
   return (
     <Card
       className={cn(
@@ -44,11 +45,11 @@ export function PlanCard({ plan, isCurrent, onUpgrade, isUpgrading }: PlanCardPr
         <Button
           variant={isCurrent ? 'outline' : 'primary'}
           size="md"
-          disabled={isCurrent || isUpgrading}
+          disabled={isCurrent || isDowngrade || isUpgrading}
           onClick={onUpgrade}
           className="w-full justify-center"
         >
-          {isCurrent ? 'Current plan' : isUpgrading ? 'Redirecting…' : `Upgrade to ${plan.label}`}
+          {isCurrent ? 'Current plan' : isDowngrade ? 'Included' : isUpgrading ? 'Redirecting…' : `Upgrade to ${plan.label}`}
         </Button>
       )}
     </Card>

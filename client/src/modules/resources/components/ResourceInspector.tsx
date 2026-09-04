@@ -191,7 +191,7 @@ export function ResourceInspector({ workspaceId, resourceKey, onClose }: Resourc
               type="button"
               onClick={() => goToPage(currentPage - 1)}
               disabled={offset === 0}
-              className="px-3 py-1.5 rounded-lg border-[1.5px] border-black text-xs font-medium text-white bg-brand hover:bg-brand-hover active:scale-[0.97] disabled:opacity-30 disabled:hover:bg-brand transition-all"
+              className="px-3 py-1.5 rounded-lg border-[1.5px] border-[#ddddc4] text-xs font-medium text-white bg-brand hover:bg-brand-hover active:scale-[0.97] disabled:opacity-30 disabled:hover:bg-brand transition-all"
             >
               Previous
             </button>
@@ -215,7 +215,7 @@ export function ResourceInspector({ workspaceId, resourceKey, onClose }: Resourc
               type="button"
               onClick={() => goToPage(currentPage + 1)}
               disabled={offset + PAGE_SIZE >= preview.row_count}
-              className="px-3 py-1.5 rounded-lg border-[1.5px] border-black text-xs font-medium text-white bg-brand hover:bg-brand-hover active:scale-[0.97] disabled:opacity-30 disabled:hover:bg-brand transition-all"
+              className="px-3 py-1.5 rounded-lg border-[1.5px] border-[#ddddc4] text-xs font-medium text-white bg-brand hover:bg-brand-hover active:scale-[0.97] disabled:opacity-30 disabled:hover:bg-brand transition-all"
             >
               Next
             </button>

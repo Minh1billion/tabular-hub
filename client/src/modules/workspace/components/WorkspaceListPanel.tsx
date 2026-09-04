@@ -97,7 +97,7 @@ export function WorkspaceListPanel({
         <button
           type="button"
           onClick={onCreateClick}
-          className="w-full flex items-center justify-center gap-2 py-[9px] bg-brand text-[#eff9f4] rounded-lg font-medium text-[13.5px] mb-3.5 border-[1.5px] border-black transition-colors hover:bg-brand-hover"
+          className="w-full flex items-center justify-center gap-2 py-[9px] bg-brand text-[#eff9f4] rounded-lg font-medium text-[13.5px] mb-3.5 border-[1.5px] border-[#ddddc4] transition-colors hover:bg-brand-hover"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M12 5v14M5 12h14" />

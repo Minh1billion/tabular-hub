@@ -1,5 +1,7 @@
 from app.config import settings
 
+TIER_ORDER = ["free", "pro", "team"]
+
 PLAN_LIMITS = {
     "free": {
         "stripe_price_id": None,

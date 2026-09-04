@@ -144,7 +144,7 @@ export function EditorPage() {
           size="sm"
           onClick={handleRun}
           disabled={createRun.isPending}
-          className="border-[1.5px] border-black"
+          className="border-[1.5px] border-[#ddddc4]"
         >
           Run
         </Button>

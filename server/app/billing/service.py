@@ -5,7 +5,7 @@ import stripe
 from sqlalchemy.orm import Session
 
 from app.billing.models import ProcessedWebhookEvent, Subscription
-from app.billing.plans import PLAN_LIMITS, tier_for_price
+from app.billing.plans import PLAN_LIMITS, TIER_ORDER, tier_for_price
 from app.config import settings
 from app.core.exceptions import AppError
 
@@ -63,6 +63,9 @@ def create_checkout_session(db: Session, user, tier: str) -> str:
         raise AppError(f"Unknown plan: {tier}")
 
     sub = get_or_create_subscription(db, user.id)
+    if sub.status in ("active", "trialing") and TIER_ORDER.index(tier) <= TIER_ORDER.index(sub.tier):
+        raise AppError(f"Already on {sub.tier}, which is equal to or higher than {tier}")
+
     if not sub.stripe_customer_id:
         customer = stripe.Customer.create(email=user.email, metadata={"user_id": str(user.id)})
         sub.stripe_customer_id = customer.id
