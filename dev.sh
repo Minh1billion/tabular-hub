@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dev.sh — start the local dev stack (docker compose) and attach the
+# dev.sh - start the local dev stack (docker compose) and attach the
 # Stripe CLI webhook listener on top of it.
 #
 # Usage:

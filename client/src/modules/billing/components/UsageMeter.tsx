@@ -1,4 +1,5 @@
 import { cn } from '@/shared/lib/cn'
+import { Badge } from '@/shared/components/ui/Badge'
 
 interface UsageMeterProps {
   label: string
@@ -14,12 +15,15 @@ export function UsageMeter({ label, used, max, formatValue }: UsageMeterProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5 text-[13px]">
-        <span className="text-slate">{label}</span>
-        <span className={cn('font-mono', isNearLimit ? 'text-warn' : 'text-muted')}>
-          {formatValue(used)} / {formatValue(max)}
-        </span>
+        <span className="text-slate font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-muted">
+            {formatValue(used)} / {formatValue(max)}
+          </span>
+          {isNearLimit && <Badge tone="error">near limit</Badge>}
+        </div>
       </div>
-      <div className="h-2 rounded-full bg-cream-soft overflow-hidden">
+      <div className="h-2.5 rounded-full bg-cream-soft border border-black overflow-hidden">
         <div
           className={cn('h-full rounded-full transition-all', isNearLimit ? 'bg-warn' : 'bg-brand')}
           style={{ width: `${percent}%` }}
