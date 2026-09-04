@@ -1,6 +1,6 @@
-import os
 from datetime import datetime
 
+from app.core import staging
 from app.core.engine import EngineLifecycle
 from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
@@ -11,15 +11,16 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
     if run.kind == "import":
         return engine_lifecycle.engine.data_resource.import_source(
             key=run.spec["key"],
-            source_kind="file",
-            source_params={"path": run.spec["path"], "format": run.spec["format"]},
+            source_kind="s3",
+            source_params={"format": run.spec["format"], **staging.s3_reader_params(run.spec["staging_key"])},
             bucket=bucket,
             overwrite=run.spec["overwrite"],
         )
     if run.kind == "export":
         return engine_lifecycle.engine.data_resource.export(
             key=run.spec["key"],
-            dest_path=run.spec["path"],
+            writer_kind="s3",
+            writer_params=staging.s3_writer_params(run.spec["staging_key"]),
             format=run.spec["format"],
             bucket=bucket,
         )
@@ -68,8 +69,8 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
 
         clear_cancel(run_id)
         engine_lifecycle.touch_bucket(str(run.workspace_id))
-        if run.kind == "import" and os.path.exists(run.spec["path"]):
-            os.remove(run.spec["path"])
+        if run.kind == "import":
+            staging.delete(run.spec["staging_key"])
         return True
     finally:
         db.close()

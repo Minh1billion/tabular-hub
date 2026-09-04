@@ -21,3 +21,13 @@ export interface ImportResourcePayload {
 export interface ExportResourcePayload {
   format: string
 }
+
+export interface PresignUploadResponse {
+  run_id: string
+  upload_url: string
+  staging_key: string
+}
+
+export interface ExportDownloadResponse {
+  download_url: string
+}

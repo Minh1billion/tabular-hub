@@ -4,11 +4,13 @@ import socket
 
 import redis
 
+from app.config import settings
 from app.core.engine import engine_lifecycle
 from app.core.queue import ack, claim_idle_tasks, ensure_group, read_tasks
+from app.database import SessionLocal
+from app.run.service import fail_stale_pending_uploads
 from app.auth import models as auth_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
-from app.resources.service import sweep_expired_exports
 from app.worker.processor import process_task
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +41,11 @@ def run() -> None:
                 if ok:
                     ack(message_id)
             engine_lifecycle.evict_idle_buckets()
-            sweep_expired_exports()
+            db = SessionLocal()
+            try:
+                fail_stale_pending_uploads(db, older_than_seconds=settings.PENDING_UPLOAD_TTL_SECONDS)
+            finally:
+                db.close()
     finally:
         engine_lifecycle.stop()
 

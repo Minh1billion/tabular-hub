@@ -17,6 +17,7 @@ interface ExportResourceDialogProps {
 
 export function ExportResourceDialog({ workspaceId, resourceKey, onClose }: ExportResourceDialogProps) {
   const [format, setFormat] = useState('csv')
+  const [downloading, setDownloading] = useState(false)
 
   const exportResource = useExportResource(workspaceId, resourceKey)
   const { data: run } = useRunTracking(workspaceId, exportResource.data?.id)
@@ -39,6 +40,17 @@ export function ExportResourceDialog({ workspaceId, resourceKey, onClose }: Expo
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     exportResource.mutate({ format })
+  }
+
+  async function handleDownload() {
+    if (!run) return
+    setDownloading(true)
+    try {
+      const url = await exportDownloadUrl(workspaceId, resourceKey, run.id)
+      window.open(url, '_blank')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -74,13 +86,8 @@ export function ExportResourceDialog({ workspaceId, resourceKey, onClose }: Expo
             {completed ? 'Close' : 'Cancel'}
           </Button>
           {completed ? (
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => window.open(exportDownloadUrl(workspaceId, resourceKey, run.id), '_blank')}
-            >
-              Download
+            <Button type="button" variant="primary" size="sm" onClick={handleDownload} disabled={downloading}>
+              {downloading ? 'Preparing…' : 'Download'}
             </Button>
           ) : (
             <Button type="submit" variant="primary" size="sm" disabled={exportResource.isPending || running}>

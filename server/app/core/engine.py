@@ -18,6 +18,7 @@ def _build_engine_settings() -> EngineSettings:
         s3_endpoint_url=settings.ENGINE_S3_ENDPOINT_URL,
         s3_access_key_id=settings.ENGINE_S3_ACCESS_KEY_ID,
         s3_secret_access_key=settings.ENGINE_S3_SECRET_ACCESS_KEY,
+        s3_allow_http=settings.ENGINE_S3_ALLOW_HTTP,
         max_cached_graphs=settings.ENGINE_MAX_CACHED_GRAPHS,
         bucket_idle_ttl=(
             timedelta(seconds=settings.ENGINE_BUCKET_IDLE_TTL_SECONDS)

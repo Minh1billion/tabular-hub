@@ -1,10 +1,24 @@
 import uuid
 
+import polars as pl
 import pytest
+
+from tabular_manner.engine.application.ports.writer_adapter import WriterAdapter
 
 from app.run.models import Run
 from app.worker.processor import process_task
 from tabular_manner.engine.lifecycle import EngineLifecycle, EngineSettings
+
+class _LocalAsS3Writer(WriterAdapter):
+    def __init__(self, bucket_name, key, format="csv", **_):
+        self.key = key
+        self.format = format
+
+    def execute(self, lf):
+        if self.format == "csv":
+            lf.sink_csv(self.key)
+        else:
+            lf.sink_parquet(self.key)
 
 @pytest.fixture
 def engine_lifecycle(tmp_path, db_session, test_user):
@@ -18,15 +32,16 @@ def engine_lifecycle(tmp_path, db_session, test_user):
     storage_root = tmp_path / ".tm"
     lifecycle = EngineLifecycle(EngineSettings(storage_root=str(storage_root)))
     lifecycle.start()
+    lifecycle.engine.data_resource._writer_factory.register("s3", _LocalAsS3Writer)
 
     yield lifecycle, workspace
     lifecycle.stop()
 
-def _make_export_run(db_session, workspace, dest_path, key="raw", format="csv"):
+def _make_export_run(db_session, workspace, staging_key, key="raw", format="csv"):
     run = Run(
         workspace_id=workspace.id,
         kind="export",
-        spec={"key": key, "format": format, "path": dest_path},
+        spec={"key": key, "format": format, "staging_key": staging_key},
         status="queued",
         idempotency_key=str(uuid.uuid4()),
     )
@@ -37,24 +52,23 @@ def _make_export_run(db_session, workspace, dest_path, key="raw", format="csv"):
 
 def test_export_run_completes_and_writes_file(db_session, engine_lifecycle, tmp_path):
     lifecycle, workspace = engine_lifecycle
-    import polars as pl
     lifecycle.engine.data_resource._resource_storage.save(
         "raw", pl.DataFrame({"a": [1, 2, 3]}).lazy(), bucket=str(workspace.id)
     )
 
-    dest_path = str(tmp_path / "out.csv")
-    run = _make_export_run(db_session, workspace, dest_path)
+    staging_key = str(tmp_path / "out.csv")
+    run = _make_export_run(db_session, workspace, staging_key)
 
     process_task(lifecycle, str(run.id))
 
     db_session.refresh(run)
     assert run.status == "completed"
-    assert open(dest_path).read() == "a\n1\n2\n3\n"
+    assert open(staging_key).read() == "a\n1\n2\n3\n"
 
 def test_export_run_missing_key_fails(db_session, engine_lifecycle, tmp_path):
     lifecycle, workspace = engine_lifecycle
-    dest_path = str(tmp_path / "out.csv")
-    run = _make_export_run(db_session, workspace, dest_path, key="does_not_exist")
+    staging_key = str(tmp_path / "out.csv")
+    run = _make_export_run(db_session, workspace, staging_key, key="does_not_exist")
 
     process_task(lifecycle, str(run.id))
 

@@ -1,49 +1,40 @@
-import os
-import tempfile
-import time
 import uuid
 
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from tabular_manner.engine.bootstrap import Engine
 
-from app.config import settings
+from app.core import staging
 from app.core.engine import drain_events
-from app.core.exceptions import PayloadTooLargeError
 from app.core.queue import enqueue_run
 from app.run import service as run_service
 from app.run.models import Run
 from app.workspace.models import Workspace
 
-async def write_upload_to_tmp(file: UploadFile, suffix: str) -> str:
-    upload_dir = os.path.join(settings.ENGINE_STORAGE_ROOT, "_uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(suffix=suffix, dir=upload_dir)
-    written = 0
-    with os.fdopen(fd, "wb") as tmp:
-        while chunk := await file.read(settings.UPLOAD_CHUNK_SIZE_BYTES):
-            written += len(chunk)
-            if written > settings.MAX_UPLOAD_SIZE_BYTES:
-                os.remove(tmp_path)
-                raise PayloadTooLargeError(
-                    f"File exceeds max upload size of {settings.MAX_UPLOAD_SIZE_BYTES} bytes"
-                )
-            tmp.write(chunk)
-    return tmp_path
-
-def import_resource(
-    db: Session, *, workspace: Workspace, key: str, format: str, overwrite: bool, tmp_path: str, idempotency_key: str
-) -> Run:
+def presign_upload(
+    db: Session, *, workspace: Workspace, key: str, filename: str, format: str, overwrite: bool, idempotency_key: str
+) -> tuple[Run, str, str]:
+    staging_key = staging.new_key(str(workspace.id), filename)
     run = run_service.create_run(
         db,
         workspace=workspace,
-        spec={"key": key, "format": format, "overwrite": overwrite, "path": tmp_path},
+        spec={"key": key, "format": format, "overwrite": overwrite, "staging_key": staging_key},
         idempotency_key=idempotency_key,
         kind="import",
+        status="pending_upload",
     )
-    if run.status == "queued":
-        enqueue_run(str(run.id))
+    upload_url = staging.presign_put(staging_key)
+    return run, upload_url, staging_key
+
+def confirm_upload(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> Run:
+    run = run_service.get_run(db, workspace_id=workspace.id, run_id=run_id)
+    if run is None or run.kind != "import":
+        raise HTTPException(status_code=404, detail="Import run not found")
+    if not staging.exists(run.spec["staging_key"]):
+        raise HTTPException(status_code=400, detail="Upload not found in staging")
+    run = run_service.mark_queued(db, run=run)
+    enqueue_run(str(run.id))
     return run
 
 def list_resources(engine: Engine, bucket: str) -> dict:
@@ -64,13 +55,11 @@ def delete_resource(engine: Engine, bucket: str, key: str) -> None:
         raise HTTPException(status_code=404, detail=result["error"])
 
 def export_resource(db: Session, *, workspace: Workspace, key: str, format: str, idempotency_key: str) -> Run:
-    export_dir = os.path.join(settings.ENGINE_STORAGE_ROOT, "_exports")
-    os.makedirs(export_dir, exist_ok=True)
-    dest_path = os.path.join(export_dir, f"{uuid.uuid4()}.{format}")
+    staging_key = staging.new_key(str(workspace.id), f"{key}.{format}")
     run = run_service.create_run(
         db,
         workspace=workspace,
-        spec={"key": key, "format": format, "path": dest_path},
+        spec={"key": key, "format": format, "staging_key": staging_key},
         idempotency_key=idempotency_key,
         kind="export",
     )
@@ -78,20 +67,11 @@ def export_resource(db: Session, *, workspace: Workspace, key: str, format: str,
         enqueue_run(str(run.id))
     return run
 
-def get_export_run(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> Run:
+def get_export_download_url(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> str:
     run = run_service.get_run(db, workspace_id=workspace.id, run_id=run_id)
     if run is None or run.kind != "export":
         raise HTTPException(status_code=404, detail="Export not found")
     if run.status != "completed":
         raise HTTPException(status_code=409, detail=f"Export is {run.status}")
-    return run
-
-def sweep_expired_exports() -> None:
-    export_dir = os.path.join(settings.ENGINE_STORAGE_ROOT, "_exports")
-    if not os.path.isdir(export_dir):
-        return
-    cutoff = time.time() - settings.EXPORT_TTL_SECONDS
-    for name in os.listdir(export_dir):
-        path = os.path.join(export_dir, name)
-        if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
-            os.remove(path)
+    filename = f"{run.spec['key']}.{run.spec['format']}"
+    return staging.presign_get(run.spec["staging_key"], filename)

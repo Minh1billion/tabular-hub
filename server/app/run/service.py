@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -9,8 +9,8 @@ from app.core.exceptions import ConflictError
 from app.run.models import Run, RunEvent
 from app.workspace.models import Workspace
 
-def create_run(db: Session, *, workspace: Workspace, spec: dict[str, Any], idempotency_key: str, kind: str = "pipeline") -> Run:
-    run = Run(workspace_id=workspace.id, kind=kind, spec=spec, status="queued", idempotency_key=idempotency_key)
+def create_run(db: Session, *, workspace: Workspace, spec: dict[str, Any], idempotency_key: str, kind: str = "pipeline", status: str = "queued") -> Run:
+    run = Run(workspace_id=workspace.id, kind=kind, spec=spec, status=status, idempotency_key=idempotency_key)
     db.add(run)
     try:
         db.commit()
@@ -42,6 +42,25 @@ def get_run(db: Session, *, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run |
 
 def list_run_events(db: Session, *, run_id: uuid.UUID) -> list[RunEvent]:
     return db.query(RunEvent).filter(RunEvent.run_id == run_id).order_by(RunEvent.attempt, RunEvent.seq).all()
+
+def mark_queued(db: Session, *, run: Run) -> Run:
+    updated = (
+        db.query(Run)
+        .filter(Run.id == run.id, Run.status == "pending_upload")
+        .update({"status": "queued"}, synchronize_session=False)
+    )
+    db.commit()
+    if updated == 0:
+        raise ConflictError(f"Run already {run.status}")
+    db.refresh(run)
+    return run
+
+def fail_stale_pending_uploads(db: Session, *, older_than_seconds: int) -> None:
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=older_than_seconds)
+    db.query(Run).filter(Run.status == "pending_upload", Run.created_at < cutoff).update(
+        {"status": "failed"}, synchronize_session=False
+    )
+    db.commit()
 
 def request_cancel_run(db: Session, *, run: Run) -> Run:
     if run.status == "cancelling":
