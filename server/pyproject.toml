@@ -18,7 +18,7 @@ dependencies = [
     "python-multipart",
     "boto3",
     "stripe",
-    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@17a9bf463e5fa0b86f0f2f841fdb59d922c5c6c0",
+    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@7db29cb",
 ]
 
 [dependency-groups]
