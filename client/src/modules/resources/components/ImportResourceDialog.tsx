@@ -5,9 +5,17 @@ import { Button } from '@/shared/components/ui/Button'
 import { Badge } from '@/shared/components/ui/Badge'
 import { useRunTracking } from '@/modules/runs/hooks-tracking'
 import { useRunEventHistory } from '@/modules/runs/hooks-event-history'
+import { useSubscription } from '@/modules/billing/hooks'
 import { useImportResource } from '../hooks'
 
 const FORMATS = ['csv', 'parquet', 'arrow', 'json']
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 interface ImportResourceDialogProps {
   workspaceId: string
@@ -23,6 +31,16 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
 
   const importResource = useImportResource(workspaceId)
   const { data: run } = useRunTracking(workspaceId, importResource.data?.id)
+  const { data: subscription } = useSubscription()
+
+  const sizeError =
+    file && subscription
+      ? file.size > subscription.max_resource_size_bytes
+        ? `File is ${formatBytes(file.size)}, plan limit is ${formatBytes(subscription.max_resource_size_bytes)}`
+        : file.size > subscription.max_total_storage_bytes - subscription.storage_used_bytes
+          ? `File exceeds remaining storage (${formatBytes(subscription.max_total_storage_bytes - subscription.storage_used_bytes)} left)`
+          : undefined
+      : undefined
 
   const failed = run?.status === 'failed'
   const completed = run?.status === 'completed'
@@ -45,7 +63,7 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!file) return
+    if (!file || sizeError) return
     importResource.mutate({ key: key.trim(), format, overwrite, file })
   }
 
@@ -59,6 +77,7 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             className="text-sm text-slate file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border file:border-line file:bg-white file:text-ink file:cursor-pointer"
           />
+          {sizeError && <p className="text-[12px] text-warn">{sizeError}</p>}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -120,7 +139,9 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
               type="submit"
               variant="primary"
               size="sm"
-              disabled={importResource.isPending || Boolean(importResource.data) || !file || !key.trim()}
+              disabled={
+                importResource.isPending || Boolean(importResource.data) || !file || !key.trim() || Boolean(sizeError)
+              }
             >
               {importResource.isPending ? 'Uploading…' : 'Import'}
             </Button>

@@ -28,7 +28,7 @@ def presign_upload(
     workspace: Workspace = Depends(get_owned_workspace),
     db: Session = Depends(get_db),
 ):
-    run, upload_url, staging_key = service.presign_upload(
+    run, post, staging_key = service.presign_upload(
         db,
         workspace=workspace,
         key=payload.key,
@@ -36,8 +36,11 @@ def presign_upload(
         format=payload.format,
         overwrite=payload.overwrite,
         idempotency_key=payload.idempotency_key,
+        content_length=payload.content_length,
     )
-    return PresignUploadResponse(run_id=str(run.id), upload_url=upload_url, staging_key=staging_key)
+    return PresignUploadResponse(
+        run_id=str(run.id), upload_url=post["url"], upload_fields=post["fields"], staging_key=staging_key
+    )
 
 @router.post("/{run_id}/confirm-upload", response_model=RunRead)
 def confirm_upload(
