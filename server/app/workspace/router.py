@@ -2,8 +2,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from tabular_manner.engine.bootstrap import Engine
 
 from app.auth.models import User
+from app.core.engine import get_engine
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.workspace import service
@@ -54,5 +56,6 @@ def delete(
     workspace_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    engine: Engine = Depends(get_engine),
 ):
-    service.delete_workspace(db, owner_id=current_user.id, workspace_id=workspace_id)
+    service.delete_workspace(db, owner_id=current_user.id, workspace_id=workspace_id, engine=engine)

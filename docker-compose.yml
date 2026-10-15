@@ -43,6 +43,7 @@ services:
       - "8000:8000"
     volumes:
       - tm_storage:/code/.tm
+      - ./server/app:/code/app
 
   worker:
     build: ./server
@@ -57,6 +58,7 @@ services:
         condition: service_healthy
     volumes:
       - tm_storage:/code/.tm
+      - ./server/app:/code/app
 
   client:
     build: ./client

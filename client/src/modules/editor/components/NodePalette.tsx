@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
 import { useUnregisterNode } from '@/modules/nodes/hooks'
 import { Input } from '@/shared/components/ui/Input'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
 import { RegisterNodeDialog } from './RegisterNodeDialog'
 
 export const NODE_DRAG_MIME = 'application/tabular-node-type'
@@ -52,12 +53,10 @@ function NodeItem({ descriptor }: { descriptor: NodeDescriptor }) {
 
 function CustomNodeItem({
   descriptor,
-  onDelete,
-  isDeleting,
+  onDeleteRequest,
 }: {
   descriptor: NodeDescriptor
-  onDelete: (name: string) => void
-  isDeleting: boolean
+  onDeleteRequest: (name: string) => void
 }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -73,9 +72,9 @@ function CustomNodeItem({
       </div>
       <button
         type="button"
-        onClick={() => onDelete(descriptor.type)}
-        disabled={isDeleting}
-        className="text-muted hover:text-warn transition-colors disabled:opacity-50 shrink-0"
+        onClick={() => onDeleteRequest(descriptor.type)}
+        className="text-muted hover:text-warn transition-colors shrink-0"
+        aria-label={`Delete custom node ${descriptor.type}`}
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M6 6 18 18M6 18 18 6" />
@@ -88,6 +87,7 @@ function CustomNodeItem({
 export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
   const [isRegistering, setIsRegistering] = useState(false)
   const [search, setSearch] = useState('')
+  const [deletingNodeName, setDeletingNodeName] = useState<string | null>(null)
   const unregisterNode = useUnregisterNode(workspaceId)
 
   const query = search.trim().toLowerCase()
@@ -100,6 +100,13 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
     [nodeLibrary, query],
   )
   const groupedBuiltin = useMemo(() => groupByCategory(filteredBuiltin), [filteredBuiltin])
+
+  function handleDeleteConfirm() {
+    if (!deletingNodeName) return
+    unregisterNode.mutate(deletingNodeName, {
+      onSuccess: () => setDeletingNodeName(null),
+    })
+  }
 
   return (
     <div className="w-[240px] bg-white border-r border-line flex flex-col p-4 overflow-auto">
@@ -137,14 +144,25 @@ export function NodePalette({ workspaceId, nodeLibrary }: NodePaletteProps) {
           <CustomNodeItem
             key={descriptor.type}
             descriptor={descriptor}
-            onDelete={(name) => unregisterNode.mutate(name)}
-            isDeleting={unregisterNode.isPending && unregisterNode.variables === descriptor.type}
+            onDeleteRequest={(name) => setDeletingNodeName(name)}
           />
         ))}
       </div>
 
       {isRegistering && (
         <RegisterNodeDialog workspaceId={workspaceId} onClose={() => setIsRegistering(false)} />
+      )}
+
+      {/* Confirm delete custom node */}
+      {deletingNodeName && (
+        <ConfirmDialog
+          title={`Delete custom node "${deletingNodeName}"?`}
+          description={`The custom node "${deletingNodeName}" will be permanently removed from this workspace. Any pipeline nodes using it will no longer function.`}
+          confirmLabel="Delete node"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeletingNodeName(null)}
+          isLoading={unregisterNode.isPending}
+        />
       )}
     </div>
   )

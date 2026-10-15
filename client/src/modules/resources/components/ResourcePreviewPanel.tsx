@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button } from '@/shared/components/ui/Button'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
 import { useDeleteResource, useResourcePreview } from '../hooks'
 
 const PAGE_SIZE = 50
@@ -12,7 +13,7 @@ interface ResourcePreviewPanelProps {
 
 export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: ResourcePreviewPanelProps) {
   const [offset, setOffset] = useState(0)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
 
   const { data: preview, isLoading } = useResourcePreview(workspaceId, activeKey ?? '', PAGE_SIZE, offset)
   const deleteResource = useDeleteResource(workspaceId)
@@ -27,14 +28,6 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
 
   const columns = preview?.rows[0] ? Object.keys(preview.rows[0]) : []
 
-  function handleDelete() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true)
-      return
-    }
-    deleteResource.mutate(activeKey!, { onSuccess: onDeleted })
-  }
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="h-12 flex items-center gap-3 px-5 border-b border-line bg-white shrink-0">
@@ -47,13 +40,12 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
         <div className="flex-1" />
         <Button
           type="button"
-          variant={confirmingDelete ? 'primary' : 'ghost'}
+          variant="ghost"
           size="sm"
-          onClick={handleDelete}
+          onClick={() => setIsConfirmingDelete(true)}
           disabled={deleteResource.isPending}
-          className={confirmingDelete ? 'bg-warn hover:bg-warn' : ''}
         >
-          {deleteResource.isPending ? 'Deleting…' : confirmingDelete ? 'Confirm delete' : 'Delete'}
+          {deleteResource.isPending ? 'Deleting…' : 'Delete'}
         </Button>
       </div>
 
@@ -114,6 +106,25 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
             Next
           </Button>
         </div>
+      )}
+
+      {/* Confirm delete resource */}
+      {isConfirmingDelete && (
+        <ConfirmDialog
+          title={`Delete dataset "${activeKey}"?`}
+          description={`The dataset "${activeKey}" will be permanently removed from this workspace. Any pipeline nodes referencing it will be affected. This action cannot be undone.`}
+          confirmLabel="Delete dataset"
+          onConfirm={() => {
+            deleteResource.mutate(activeKey!, {
+              onSuccess: () => {
+                setIsConfirmingDelete(false)
+                onDeleted()
+              },
+            })
+          }}
+          onCancel={() => setIsConfirmingDelete(false)}
+          isLoading={deleteResource.isPending}
+        />
       )}
     </div>
   )

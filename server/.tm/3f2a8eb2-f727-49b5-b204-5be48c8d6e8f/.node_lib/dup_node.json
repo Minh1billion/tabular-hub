@@ -1,0 +1,6 @@
+{
+  "name": "dup_node",
+  "description": "",
+  "created_at": "2026-09-02T18:20:12.982903+00:00",
+  "expression": "value * 2"
+}
