@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/lib/api-client'
-import { RunStreamEvent, TERMINAL_RUN_EVENTS } from './types'
+import { Run, RunStreamEvent, TERMINAL_RUN_EVENTS } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export function useRunEvents(workspaceId: string | undefined, runId: string | undefined) {
+  const queryClient = useQueryClient()
   const [events, setEvents] = useState<RunStreamEvent[]>([])
   const sourceRef = useRef<EventSource | null>(null)
 
@@ -38,12 +40,17 @@ export function useRunEvents(workspaceId: string | undefined, runId: string | un
         const parsed = JSON.parse(message.data) as RunStreamEvent
         setEvents((prev) => [...prev, parsed])
         if (TERMINAL_RUN_EVENTS.includes(parsed.event as (typeof TERMINAL_RUN_EVENTS)[number])) {
+          queryClient.setQueryData<Run>(['workspaces', workspaceId, 'runs', runId], (prev) =>
+            prev ? { ...prev, status: parsed.event, updated_at: parsed.ts ?? prev.updated_at } : prev,
+          )
+          queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'runs'] })
           source.close()
         }
       }
 
       source.onerror = () => {
         source.close()
+        queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'runs', runId] })
       }
     }
 
