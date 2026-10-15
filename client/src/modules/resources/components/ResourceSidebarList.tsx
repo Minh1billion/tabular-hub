@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/shared/lib/cn'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
 import { resourcesQueryKey, useDeleteResource, useResources } from '../hooks'
 import { ExportResourceDialog } from './ExportResourceDialog'
 import { ImportResourceDialog } from './ImportResourceDialog'
@@ -18,22 +19,20 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
   const { data: resources, isLoading } = useResources(workspaceId)
   const deleteResource = useDeleteResource(workspaceId)
   const [isImporting, setIsImporting] = useState(false)
-  const [confirmingKey, setConfirmingKey] = useState<string | null>(null)
+  const [deletingKey, setDeletingKey] = useState<string | null>(null)
   const [exportingKey, setExportingKey] = useState<string | null>(null)
 
   const keys = resources?.keys ?? []
 
-  function handleDelete(key: string) {
-    if (confirmingKey !== key) {
-      setConfirmingKey(key)
-      return
-    }
+  function handleDeleteConfirm() {
+    if (!deletingKey) return
+    const key = deletingKey
     deleteResource.mutate(key, {
       onSuccess: () => {
-        setConfirmingKey(null)
+        setDeletingKey(null)
         onDeleted(key)
       },
-      onError: () => setConfirmingKey(null),
+      onError: () => setDeletingKey(null),
     })
   }
 
@@ -113,12 +112,9 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(key)}
-                disabled={deleteResource.isPending && confirmingKey === key}
-                className={cn(
-                  'shrink-0 transition-colors',
-                  confirmingKey === key ? 'text-warn' : 'text-muted hover:text-warn',
-                )}
+                onClick={() => setDeletingKey(key)}
+                disabled={deleteResource.isPending && deletingKey === key}
+                className="shrink-0 text-muted hover:text-warn transition-colors"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" />
@@ -140,6 +136,17 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
             queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
             setIsImporting(false)
           }}
+        />
+      )}
+
+      {deletingKey && (
+        <ConfirmDialog
+          title={`Delete dataset "${deletingKey}"?`}
+          description={`The dataset "${deletingKey}" will be permanently removed from this workspace. Any pipeline nodes referencing it will be affected. This action cannot be undone.`}
+          confirmLabel="Delete dataset"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeletingKey(null)}
+          isLoading={deleteResource.isPending}
         />
       )}
 

@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
 import { forwardRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/shared/components/ui/Card'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Avatar } from '@/shared/components/ui/Avatar'
@@ -64,7 +64,25 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
             <path d="M4 10h16M10 10v10" />
           </svg>
         </div>
-        <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
+          <button
+            type="button"
+            aria-label="Workspace actions"
+            onClick={(event) => {
+              event.stopPropagation()
+              const rect = event.currentTarget.getBoundingClientRect()
+              setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted hover:text-ink hover:bg-cream-soft transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {isEditing ? (

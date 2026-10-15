@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ENGINE_MAX_CACHED_GRAPHS: int = 128
     ENGINE_BUCKET_IDLE_TTL_SECONDS: int | None = None
 
+    RUN_PROGRESS_PERSIST_MIN_INTERVAL_SECONDS: float = 2.0
+    RUN_PROGRESS_PERSIST_MIN_PERCENT: float = 5.0
+
     STAGING_S3_BUCKET_NAME: str = "tm-staging"
     STAGING_S3_REGION: str = "us-east-1"
     STAGING_S3_ENDPOINT_URL: str | None = None

@@ -2,6 +2,7 @@ import { PropsWithChildren, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import logo from '@/assets/logo.svg'
 import { Avatar } from '@/shared/components/ui/Avatar'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
 import { useCurrentUser, useLogout } from '@/modules/auth/hooks'
 import { useWorkspaces } from '@/modules/workspace/hooks'
 import { useSubscription } from '@/modules/billing/hooks'
@@ -48,13 +49,22 @@ export function AppHeader() {
   const { id: activeWorkspaceId } = useParams<{ id: string }>()
   const [menuOpen, setMenuOpen] = useState(false)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
 
   const displayName = user?.display_name ?? user?.email ?? ''
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId)
 
   function handleLogout() {
+    setLogoutError(null)
     logout.mutate(undefined, {
-      onSuccess: () => navigate('/login', { replace: true }),
+      onSuccess: () => {
+        setShowLogoutConfirm(false)
+        navigate('/login', { replace: true })
+      },
+      onError: (err) => {
+        setLogoutError(err instanceof Error ? err.message : 'Failed to log out')
+      },
     })
   }
 
@@ -151,15 +161,32 @@ export function AppHeader() {
             <div className="px-3 py-1.5 text-xs text-muted truncate">{user?.email}</div>
             <button
               type="button"
-              onClick={handleLogout}
-              disabled={logout.isPending}
-              className="w-full text-left px-3 py-1.5 text-sm text-ink hover:bg-cream-soft transition-colors disabled:opacity-50"
+              onClick={() => {
+                setMenuOpen(false)
+                setLogoutError(null)
+                setShowLogoutConfirm(true)
+              }}
+              className="w-full text-left px-3 py-1.5 text-sm text-ink hover:bg-cream-soft transition-colors"
             >
-              {logout.isPending ? 'Logging out…' : 'Log out'}
+              Log out
             </button>
           </div>
         )}
       </div>
+
+      {showLogoutConfirm && (
+        <ConfirmDialog
+          title="Log out"
+          description="Are you sure you want to log out of your account?"
+          confirmLabel="Log out"
+          loadingLabel="Logging out…"
+          confirmVariant="primary"
+          isLoading={logout.isPending}
+          error={logoutError}
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
     </header>
   )
 }

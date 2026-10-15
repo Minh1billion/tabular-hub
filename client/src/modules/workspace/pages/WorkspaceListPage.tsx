@@ -3,6 +3,8 @@ import { useCurrentUser } from '@/modules/auth/hooks'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
 import { useCreateWorkspace, useDeleteWorkspace, useRenameWorkspace, useWorkspaces } from '../hooks'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
+import { Workspace } from '../types'
 import { WorkspaceListPanel } from '../components/WorkspaceListPanel'
 import { WorkspaceCard } from '../components/WorkspaceCard'
 import { CreateWorkspaceCard } from '../components/CreateWorkspaceCard'
@@ -20,6 +22,8 @@ export function WorkspaceListPage() {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounce(query, 150)
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const filteredWorkspaces = useMemo(() => {
     const term = debouncedQuery.trim().toLowerCase()
@@ -34,6 +38,20 @@ export function WorkspaceListPage() {
   }, [workspaces, activeId])
 
   const ownerName = user?.display_name ?? user?.email ?? 'You'
+
+  function handleDeleteConfirm() {
+    if (!deletingWorkspace) return
+    setDeleteError(null)
+    deleteWorkspace.mutate(deletingWorkspace.id, {
+      onSuccess: () => {
+        if (activeId === deletingWorkspace.id) setActiveId(null)
+        setDeletingWorkspace(null)
+      },
+      onError: (err: unknown) => {
+        setDeleteError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      },
+    })
+  }
 
   function handleSelectFromPanel(id: string) {
     setActiveId(id)
@@ -76,7 +94,10 @@ export function WorkspaceListPage() {
                 workspace={workspace}
                 ownerName={ownerName}
                 isPersonal={workspace.owner_id === user?.id && workspaces.length === 1}
-                onDelete={(id) => deleteWorkspace.mutate(id)}
+                onDelete={(id) => {
+                  const target = workspaces.find((item) => item.id === id)
+                  if (target) setDeletingWorkspace(target)
+                }}
                 onRename={(id, name) => renameWorkspace.mutate({ id, name })}
                 isDeleting={deleteWorkspace.isPending && deleteWorkspace.variables === workspace.id}
                 isHighlighted={highlightedId === workspace.id}
@@ -109,6 +130,21 @@ export function WorkspaceListPage() {
           </div>
         )}
       </main>
+
+      {deletingWorkspace && (
+        <ConfirmDialog
+          title={`Delete "${deletingWorkspace.name}"?`}
+          description={`This will permanently delete the workspace "${deletingWorkspace.name}" along with all its pipelines, datasets, and run history. This action cannot be undone.`}
+          confirmLabel="Delete workspace"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setDeletingWorkspace(null)
+            setDeleteError(null)
+          }}
+          isLoading={deleteWorkspace.isPending}
+          error={deleteError}
+        />
+      )}
     </div>
   )
 }
