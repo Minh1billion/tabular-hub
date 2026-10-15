@@ -12,7 +12,7 @@ export function Modal({ onClose, title, children, className, ...props }: ModalPr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="absolute inset-0" onClick={onClose} />
       <div
-        className={cn('relative w-[460px] max-w-[90vw] bg-white border border-line rounded-panel p-5', className)}
+        className={cn('relative w-[460px] max-w-[90vw] bg-white border-2 border-black rounded-panel p-5', className)}
         {...props}
       >
         <div className="flex items-center justify-between mb-4">

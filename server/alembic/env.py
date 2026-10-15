@@ -8,8 +8,10 @@ from sqlalchemy import engine_from_config, pool
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.auth import models as auth_models
+from app.billing import models as billing_models
 from app.config import settings
 from app.database import Base
+from app.resources import models as resources_models
 from app.run import models as run_models
 from app.workspace import models as workspace_models
 

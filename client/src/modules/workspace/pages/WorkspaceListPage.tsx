@@ -1,28 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCurrentUser } from '@/modules/auth/hooks'
-import { useCreateWorkspace, useDeleteWorkspace, useUpdateWorkspace, useWorkspaces } from '../hooks'
+import { useDebounce } from '@/shared/hooks/useDebounce'
+import { GridPattern } from '@/shared/components/ui/GridPattern'
+import { useCreateWorkspace, useDeleteWorkspace, useRenameWorkspace, useWorkspaces } from '../hooks'
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
+import { Workspace } from '../types'
 import { WorkspaceListPanel } from '../components/WorkspaceListPanel'
 import { WorkspaceCard } from '../components/WorkspaceCard'
 import { CreateWorkspaceCard } from '../components/CreateWorkspaceCard'
-import { RenameWorkspaceDialog } from '../components/RenameWorkspaceDialog'
-import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
-import { Workspace } from '../types'
 
 export function WorkspaceListPage() {
   const { data: user } = useCurrentUser()
   const { data: workspaces = [], isLoading } = useWorkspaces()
   const createWorkspace = useCreateWorkspace()
   const deleteWorkspace = useDeleteWorkspace()
+  const renameWorkspace = useRenameWorkspace()
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-
-  // Delete confirmation state
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const debouncedQuery = useDebounce(query, 150)
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  // Rename state
-  const [renamingWorkspace, setRenamingWorkspace] = useState<Workspace | null>(null)
-  const updateWorkspace = useUpdateWorkspace(renamingWorkspace?.id ?? '')
+
+  const filteredWorkspaces = useMemo(() => {
+    const term = debouncedQuery.trim().toLowerCase()
+    if (!term) return workspaces
+    return workspaces.filter((workspace) => workspace.name.toLowerCase().includes(term))
+  }, [workspaces, debouncedQuery])
 
   useEffect(() => {
     if (!activeId && workspaces.length > 0) {
@@ -41,39 +48,33 @@ export function WorkspaceListPage() {
         setDeletingWorkspace(null)
       },
       onError: (err: unknown) => {
-        const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
-        setDeleteError(msg)
+        setDeleteError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       },
     })
   }
 
-  function handleRenameConfirm(newName: string) {
-    if (!renamingWorkspace) return
-    updateWorkspace.mutate(
-      { name: newName },
-      { onSuccess: () => setRenamingWorkspace(null) },
-    )
+  function handleSelectFromPanel(id: string) {
+    setActiveId(id)
+    cardRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightedId(id)
+    window.setTimeout(() => setHighlightedId((current) => (current === id ? null : current)), 1600)
   }
 
   return (
     <div className="flex h-full">
       <WorkspaceListPanel
-        workspaces={workspaces}
+        workspaces={filteredWorkspaces}
         activeId={activeId}
-        onSelect={setActiveId}
+        onSelect={handleSelectFromPanel}
         onCreateClick={() => setIsCreating(true)}
-        onDelete={(id) => {
-          const ws = workspaces.find((w) => w.id === id)
-          if (ws) setDeletingWorkspace(ws)
-        }}
-        onRename={(id) => {
-          const ws = workspaces.find((w) => w.id === id)
-          if (ws) setRenamingWorkspace(ws)
-        }}
+        query={query}
+        onQueryChange={setQuery}
       />
 
-      <main className="flex-1 overflow-auto px-10 py-8">
-        <div className="flex items-end justify-between mb-6">
+      <main className="relative flex-1 overflow-auto px-10 py-8">
+        <GridPattern cellSize={28} />
+
+        <div className="relative flex items-end justify-between mb-6">
           <div>
             <h2 className="font-headline font-semibold text-[22px] mb-1.5">Your workspaces</h2>
             <p className="text-[13.5px] text-slate">Manage your workspaces and the tables inside them.</p>
@@ -81,48 +82,55 @@ export function WorkspaceListPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-muted">Loading workspaces…</p>
+          <p className="relative text-sm text-muted">Loading workspaces…</p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3.5">
-            {workspaces.map((workspace) => (
+          <div className="relative grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3.5">
+            {filteredWorkspaces.map((workspace) => (
               <WorkspaceCard
                 key={workspace.id}
+                ref={(el) => {
+                  cardRefs.current[workspace.id] = el
+                }}
                 workspace={workspace}
                 ownerName={ownerName}
                 isPersonal={workspace.owner_id === user?.id && workspaces.length === 1}
                 onDelete={(id) => {
-                  const ws = workspaces.find((w) => w.id === id)
-                  if (ws) setDeletingWorkspace(ws)
+                  const target = workspaces.find((item) => item.id === id)
+                  if (target) setDeletingWorkspace(target)
                 }}
-                onRename={(id) => {
-                  const ws = workspaces.find((w) => w.id === id)
-                  if (ws) setRenamingWorkspace(ws)
-                }}
+                onRename={(id, name) => renameWorkspace.mutate({ id, name })}
+                isDeleting={deleteWorkspace.isPending && deleteWorkspace.variables === workspace.id}
+                isHighlighted={highlightedId === workspace.id}
               />
             ))}
 
-            <CreateWorkspaceCard
-              isOpen={isCreating}
-              onOpen={() => setIsCreating(true)}
-              onCancel={() => setIsCreating(false)}
-              onSubmit={(name) =>
-                createWorkspace.mutate(
-                  { name },
-                  {
-                    onSuccess: (workspace) => {
-                      setActiveId(workspace.id)
-                      setIsCreating(false)
+            {debouncedQuery && filteredWorkspaces.length === 0 && (
+              <p className="text-sm text-muted col-span-full">No workspaces match “{debouncedQuery}”.</p>
+            )}
+
+            {!debouncedQuery && (
+              <CreateWorkspaceCard
+                isOpen={isCreating}
+                onOpen={() => setIsCreating(true)}
+                onCancel={() => setIsCreating(false)}
+                onSubmit={(name) =>
+                  createWorkspace.mutate(
+                    { name },
+                    {
+                      onSuccess: (workspace) => {
+                        setActiveId(workspace.id)
+                        setIsCreating(false)
+                      },
                     },
-                  },
-                )
-              }
-              isSubmitting={createWorkspace.isPending}
-            />
+                  )
+                }
+                isSubmitting={createWorkspace.isPending}
+              />
+            )}
           </div>
         )}
       </main>
 
-      {/* Delete confirmation dialog */}
       {deletingWorkspace && (
         <ConfirmDialog
           title={`Delete "${deletingWorkspace.name}"?`}
@@ -135,16 +143,6 @@ export function WorkspaceListPage() {
           }}
           isLoading={deleteWorkspace.isPending}
           error={deleteError}
-        />
-      )}
-
-      {/* Rename dialog */}
-      {renamingWorkspace && (
-        <RenameWorkspaceDialog
-          currentName={renamingWorkspace.name}
-          onConfirm={handleRenameConfirm}
-          onCancel={() => setRenamingWorkspace(null)}
-          isLoading={updateWorkspace.isPending}
         />
       )}
     </div>

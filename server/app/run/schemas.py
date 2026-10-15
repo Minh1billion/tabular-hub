@@ -33,6 +33,11 @@ class RunEventRead(BaseModel):
 class ValidateRequest(BaseModel):
     spec: dict[str, Any]
 
+class NodeErrorRead(BaseModel):
+    node_id: str | None = None
+    node_type: str | None = None
+    message: str
+
 class ValidateResponse(BaseModel):
     valid: bool
-    error: str | None = None
+    errors: list[NodeErrorRead] = []

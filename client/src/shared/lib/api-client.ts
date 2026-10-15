@@ -35,20 +35,35 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T
 }
 
-async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
+function uploadRequest<T>(path: string, formData: FormData, onProgress?: (percent: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_URL}${path}`)
+    xhr.withCredentials = true
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      let data: any = null
+      try {
+        data = JSON.parse(xhr.responseText)
+      } catch {
+        data = null
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as T)
+      } else {
+        reject(new ApiError(xhr.status, data?.detail ?? 'Something went wrong'))
+      }
+    }
+
+    xhr.onerror = () => reject(new ApiError(0, 'Network error'))
+    xhr.send(formData)
   })
-
-  const data = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new ApiError(response.status, data?.detail ?? 'Something went wrong')
-  }
-
-  return data as T
 }
 
 export const apiClient = {
@@ -56,7 +71,8 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  upload: <T>(path: string, formData: FormData) => uploadRequest<T>(path, formData),
+  upload: <T>(path: string, formData: FormData, onProgress?: (percent: number) => void) =>
+    uploadRequest<T>(path, formData, onProgress),
 }
 
 export function oauthLoginUrl(provider: 'google' | 'github') {

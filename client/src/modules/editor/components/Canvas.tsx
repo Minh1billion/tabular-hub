@@ -14,12 +14,12 @@ import {
   useEdgesState,
   useNodesState,
 } from '@xyflow/react'
-import { NodeDescriptor, NodeLibrary } from '@/modules/nodes/types'
+import { NodeDescriptor, NodeLibrary } from '@/modules/editor/types'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
+import { NODE_DRAG_MIME } from '@/modules/editor/nodes/components/NodePalette'
 import { GraphConnection, GraphNode, GraphSpec } from '../types'
 import { PipelineNode, PipelineNodeData } from './PipelineNode'
-import { NodeInspector } from './NodeInspector'
-import { NODE_DRAG_MIME } from './NodePalette'
+import { NodeInspector } from '../nodes/components/NodeInspector'
 
 type CanvasContextMenu =
   | { type: 'node'; id: string; x: number; y: number }
@@ -31,16 +31,23 @@ function edgeId(connection: GraphConnection) {
   return [connection.from, connection.to, connection.on, connection.into].filter(Boolean).join(':')
 }
 
-function toFlowNodes(nodes: GraphNode[], descriptors: Map<string, NodeDescriptor>): Node[] {
+function toFlowNodes(
+  nodes: GraphNode[],
+  descriptors: Map<string, NodeDescriptor>,
+  onRename: (id: string, name: string) => void,
+  selectedNodeId: string | null,
+): Node[] {
   return nodes.map((node) => ({
     id: node.id,
     type: 'pipeline',
     position: node.position,
+    selected: node.id === selectedNodeId,
     data: {
       label: node.name,
       nodeType: node.type,
       params: node.params,
       descriptor: descriptors.get(node.type),
+      onRename: (name: string) => onRename(node.id, name),
     } satisfies PipelineNodeData,
   }))
 }
@@ -78,12 +85,15 @@ function toGraphSpec(name: string, nodes: Node[], edges: Edge[]): GraphSpec {
 }
 
 interface CanvasProps {
+  workspaceId: string
   spec: GraphSpec
   onSpecChange: (spec: GraphSpec) => void
   nodeLibrary?: NodeLibrary
+  errorNodeIds?: string[]
+  focusNodeId?: string | null
 }
 
-export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
+export function Canvas({ workspaceId, spec, onSpecChange, nodeLibrary, errorNodeIds, focusNodeId }: CanvasProps) {
   const descriptors = useMemo(() => {
     const map = new Map<string, NodeDescriptor>()
     nodeLibrary?.builtin.forEach((descriptor) => map.set(descriptor.type, descriptor))
@@ -91,12 +101,29 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
     return map
   }, [nodeLibrary])
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodes(spec.nodes, descriptors))
+  const setNodesRef = useRef<React.Dispatch<React.SetStateAction<Node[]>>>(() => {})
+  function renameNode(id: string, name: string) {
+    setNodesRef.current((current) =>
+      current.map((node) => (node.id === id ? { ...node, data: { ...node.data, label: name } } : node)),
+    )
+  }
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+    toFlowNodes(spec.nodes, descriptors, renameNode, localStorage.getItem(`canvas.selectedNodeId:${workspaceId}`)),
+  )
+  setNodesRef.current = setNodes
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections))
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
+    () => localStorage.getItem(`canvas.selectedNodeId:${workspaceId}`),
+  )
   const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (selectedNodeId) localStorage.setItem(`canvas.selectedNodeId:${workspaceId}`, selectedNodeId)
+    else localStorage.removeItem(`canvas.selectedNodeId:${workspaceId}`)
+  }, [workspaceId, selectedNodeId])
 
   useEffect(() => {
     setNodes((current) =>
@@ -107,6 +134,26 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [descriptors])
+
+  useEffect(() => {
+    setNodes((current) =>
+      current.map((node) => ({
+        ...node,
+        data: { ...node.data, hasError: (errorNodeIds ?? []).includes(node.id) },
+      })),
+    )
+  }, [errorNodeIds, setNodes])
+
+  useEffect(() => {
+    if (!focusNodeId) return
+    setNodes((current) => current.map((node) => ({ ...node, selected: node.id === focusNodeId })))
+    setSelectedNodeId(focusNodeId)
+    const target = nodes.find((node) => node.id === focusNodeId)
+    if (target && reactFlowInstance.current) {
+      reactFlowInstance.current.setCenter(target.position.x, target.position.y, { zoom: 1, duration: 300 })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNodeId])
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -148,7 +195,13 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
           id,
           type: 'pipeline',
           position,
-          data: { label: nodeType, nodeType, params: {}, descriptor: descriptors.get(nodeType) } satisfies PipelineNodeData,
+          data: {
+            label: nodeType,
+            nodeType,
+            params: {},
+            descriptor: descriptors.get(nodeType),
+            onRename: (name: string) => renameNode(id, name),
+          } satisfies PipelineNodeData,
         },
       ])
     },
@@ -196,8 +249,14 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
     setSelectedNodeId(null)
   }, [setNodes])
 
+  const lastPushedSpecRef = useRef<string | null>(null)
+
   useEffect(() => {
-    onSpecChange(toGraphSpec(spec.name, nodes, edges))
+    const nextSpec = toGraphSpec(spec.name, nodes, edges)
+    const serialized = JSON.stringify(nextSpec)
+    if (serialized === lastPushedSpecRef.current) return
+    lastPushedSpecRef.current = serialized
+    onSpecChange(nextSpec)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges])
 
@@ -209,6 +268,10 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
         node.id === selectedNodeId ? { ...node, data: { ...node.data, params } } : node,
       ),
     )
+  }
+
+  function updateSelectedName(name: string) {
+    if (selectedNodeId) renameNode(selectedNodeId, name)
   }
 
   return (
@@ -230,14 +293,17 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
             reactFlowInstance.current = instance
           }}
           onSelectionChange={({ nodes: selected }) => setSelectedNodeId(selected[0]?.id ?? null)}
+          onNodeClick={() => setContextMenu(null)}
+          onEdgeClick={() => setContextMenu(null)}
           onNodeContextMenu={onNodeContextMenu}
           onEdgeContextMenu={onEdgeContextMenu}
           onPaneContextMenu={onPaneContextMenu}
+          onPaneClick={() => setContextMenu(null)}
           nodeTypes={nodeTypes}
           fitView
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} />
+          <Background variant={BackgroundVariant.Lines} gap={24} size={1} color="var(--line)" />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable />
         </ReactFlow>
@@ -246,23 +312,37 @@ export function Canvas({ spec, onSpecChange, nodeLibrary }: CanvasProps) {
             Drag a node from the library to get started.
           </div>
         )}
-      </div>
 
-      {selectedGraphNode && (
-        <NodeInspector
-          node={selectedGraphNode}
-          descriptor={descriptors.get(selectedGraphNode.type)}
-          onChange={updateSelectedParams}
-          onClose={closeInspector}
-        />
-      )}
+        {selectedGraphNode && (
+          <NodeInspector
+            key={selectedGraphNode.id}
+            workspaceId={workspaceId}
+            node={selectedGraphNode}
+            descriptor={descriptors.get(selectedGraphNode.type)}
+            onChange={updateSelectedParams}
+            onRename={updateSelectedName}
+            onClose={closeInspector}
+          />
+        )}
+      </div>
 
       {contextMenu?.type === 'node' && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          items={[{ label: 'Delete node', destructive: true, onClick: () => deleteNode(contextMenu.id) }]}
+          items={[
+            {
+              label: 'Rename node',
+              onClick: () =>
+                setNodes((current) =>
+                  current.map((node) =>
+                    node.id === contextMenu.id ? { ...node, data: { ...node.data, renameSignal: Date.now() } } : node,
+                  ),
+                ),
+            },
+            { label: 'Delete node', destructive: true, onClick: () => deleteNode(contextMenu.id) },
+          ]}
         />
       )}
 

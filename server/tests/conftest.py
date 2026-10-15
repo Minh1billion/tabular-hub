@@ -9,6 +9,10 @@ os.environ.setdefault("GITHUB_CLIENT_ID", "test")
 os.environ.setdefault("GITHUB_CLIENT_SECRET", "test")
 os.environ.setdefault("OAUTH_REDIRECT_BASE_URL", "http://testserver")
 os.environ.setdefault("FRONTEND_URL", "http://testserver")
+os.environ.setdefault("ENGINE_BACKEND", "local")
+os.environ.setdefault("STAGING_S3_ENDPOINT_URL", "http://localhost:9000")
+os.environ.setdefault("STAGING_S3_ACCESS_KEY_ID", "test")
+os.environ.setdefault("STAGING_S3_SECRET_ACCESS_KEY", "test")
 
 import fakeredis
 from fakeredis import aioredis as fakeaioredis

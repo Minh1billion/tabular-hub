@@ -1,12 +1,19 @@
 import json
 from datetime import datetime, timezone
 
+import polars as pl
 import pytest
 from httpx import ASGITransport, AsyncClient
+from tabular_manner.engine.application.io.resource_storage import ResourceStorage
 
 import app.core.queue as queue_module
+from app.core.engine import engine_lifecycle
 from app.core.security import create_access_token
 from app.main import app
+
+def _seed_raw_resource(workspace_id: str) -> None:
+    resource_storage = ResourceStorage(repository=engine_lifecycle.engine.object_storage.resource_repository)
+    resource_storage.save("raw", pl.DataFrame({"a": [1, 2]}).lazy(), bucket=workspace_id)
 
 @pytest.fixture
 def workspace(auth_client):
@@ -101,13 +108,35 @@ def test_list_runs_empty(auth_client, workspace):
     assert response.json() == []
 
 def test_validate_valid_spec(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
     spec = {
         "nodes": [{"id": "1", "type": "fetch_internal", "name": "Fetch", "params": {"key": "raw"}}],
         "connections": [],
     }
     response = auth_client.post(f"/workspaces/{workspace['id']}/runs/validate", json={"spec": spec})
     assert response.status_code == 200
-    assert response.json() == {"valid": True, "error": None}
+    assert response.json() == {"valid": True, "errors": []}
+
+def test_validate_schema_error_returns_node_id(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
+    spec = {
+        "nodes": [
+            {
+                "id": "1",
+                "type": "fetch_internal",
+                "name": "Fetch",
+                "params": {"key": "raw", "schema": {"a": "Int64"}},
+            },
+            {"id": "2", "type": "select", "name": "Select", "params": {"columns": ["ghost"]}},
+        ],
+        "connections": [{"from": "1", "to": "2"}],
+    }
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/validate", json={"spec": spec})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["errors"][0]["node_id"] == "2"
+    assert body["errors"][0]["node_type"] == "select"
 
 def test_validate_invalid_spec_no_entry(auth_client, workspace):
     spec = {"nodes": [], "connections": []}
@@ -115,7 +144,7 @@ def test_validate_invalid_spec_no_entry(auth_client, workspace):
     assert response.status_code == 200
     body = response.json()
     assert body["valid"] is False
-    assert "entry node" in body["error"]
+    assert "entry node" in body["errors"][0]["message"]
 
 def test_validate_unknown_node_type(auth_client, workspace):
     spec = {
@@ -236,3 +265,27 @@ async def test_stream_run_events(auth_client, workspace, test_user):
         await publisher
 
     assert [e["event"] for e in received] == ["validating", "completed"]
+
+async def test_stream_run_events_already_completed_before_subscribe(auth_client, workspace, db_session, test_user):
+    created = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "sse-2"},
+    )
+    run_id = created.json()["id"]
+
+    from app.run.models import Run
+    db_session.query(Run).filter(Run.id == run_id).update({"status": "completed"})
+    db_session.commit()
+
+    token = create_access_token(str(test_user.id))
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", cookies={"access_token": token}) as ac:
+        received = []
+        async with ac.stream("GET", f"/workspaces/{workspace['id']}/runs/{run_id}/events", timeout=10) as resp:
+            assert resp.status_code == 200
+            async for line in resp.aiter_lines():
+                if line.startswith("data:"):
+                    received.append(json.loads(line[len("data:"):].strip()))
+                    break
+
+    assert received == [{"event": "completed"}]

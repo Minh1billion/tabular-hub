@@ -1,16 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/shared/components/ui/Card'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Avatar } from '@/shared/components/ui/Avatar'
+import { Input } from '@/shared/components/ui/Input'
+import { ContextMenu } from '@/shared/components/ui/ContextMenu'
 import { Workspace } from '../types'
+import { workspaceColorFor } from '../lib/color'
 
 interface WorkspaceCardProps {
   workspace: Workspace
   ownerName: string
   isPersonal: boolean
   onDelete: (id: string) => void
-  onRename: (id: string) => void
+  onRename: (id: string, name: string) => void
+  isDeleting: boolean
+  isHighlighted?: boolean
 }
 
 function formatDate(iso: string) {
@@ -21,106 +26,108 @@ function formatDate(iso: string) {
   })
 }
 
-interface DropdownMenuProps {
-  onRename: () => void
-  onDelete: () => void
-  onClose: () => void
-}
-
-function DropdownMenu({ onRename, onDelete, onClose }: DropdownMenuProps) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  // Close when clicking outside
-  useEffect(() => {
-    function handleOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [onClose])
-
-  return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-7 z-20 min-w-[150px] bg-white border border-line rounded-lg py-1 shadow-lg"
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onRename()
-          onClose()
-        }}
-        className="w-full text-left px-3 py-1.5 text-[13px] text-ink hover:bg-cream-soft transition-colors"
-      >
-        Rename
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete()
-          onClose()
-        }}
-        className="w-full text-left px-3 py-1.5 text-[13px] text-warn hover:bg-cream-soft transition-colors"
-      >
-        Delete
-      </button>
-    </div>
-  )
-}
-
-export function WorkspaceCard({ workspace, ownerName, isPersonal, onDelete, onRename }: WorkspaceCardProps) {
+export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(function WorkspaceCard(
+  { workspace, ownerName, isPersonal, onDelete, onRename, isDeleting, isHighlighted },
+  ref,
+) {
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const accentColor = workspaceColorFor(workspace.id)
+  const [isEditing, setIsEditing] = useState(false)
+  const [nameDraft, setNameDraft] = useState(workspace.name)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  function submitRename() {
+    const trimmed = nameDraft.trim()
+    setIsEditing(false)
+    if (trimmed && trimmed !== workspace.name) onRename(workspace.id, trimmed)
+    else setNameDraft(workspace.name)
+  }
 
   return (
-    <Card className="cursor-pointer relative" onClick={() => navigate(`/workspaces/${workspace.id}`)}>
+    <Card
+      ref={ref}
+      highlighted={isHighlighted}
+      className="cursor-pointer border-2 !border-black"
+      onClick={() => navigate(`/workspaces/${workspace.id}`)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        setContextMenu({ x: event.clientX, y: event.clientY })
+      }}
+    >
       <div className="flex items-start justify-between mb-3.5">
-        <div className="w-[34px] h-[34px] rounded-[9px] bg-brand-tint flex items-center justify-center">
-          <svg className="w-4 h-4 text-[#0f6e4c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <div
+          className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center"
+          style={{ background: `color-mix(in srgb, ${accentColor} 16%, white)` }}
+        >
+          <svg className="w-4 h-4" style={{ color: accentColor }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <path d="M4 10h16M10 10v10" />
           </svg>
         </div>
         <div className="flex items-center gap-2">
           <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
-          {/* ⋯ Menu button */}
-          <div className="relative">
-            <button
-              type="button"
-              aria-label="Workspace actions"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenuOpen((open) => !open)
-              }}
-              className="w-6 h-6 flex items-center justify-center rounded text-muted hover:text-ink hover:bg-cream-soft transition-colors"
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-              </svg>
-            </button>
-            {menuOpen && (
-              <DropdownMenu
-                onRename={() => onRename(workspace.id)}
-                onDelete={() => onDelete(workspace.id)}
-                onClose={() => setMenuOpen(false)}
-              />
-            )}
-          </div>
+          <button
+            type="button"
+            aria-label="Workspace actions"
+            onClick={(event) => {
+              event.stopPropagation()
+              const rect = event.currentTarget.getBoundingClientRect()
+              setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted hover:text-ink hover:bg-cream-soft transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      <h3 className="text-[15px] font-semibold mb-1">{workspace.name}</h3>
+      {isEditing ? (
+        <Input
+          autoFocus
+          maxLength={200}
+          value={nameDraft}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => setNameDraft(event.target.value)}
+          onBlur={submitRename}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') submitRename()
+            if (event.key === 'Escape') {
+              setNameDraft(workspace.name)
+              setIsEditing(false)
+            }
+          }}
+          className="mb-1"
+        />
+      ) : (
+        <h3 className="text-[15px] font-semibold truncate min-w-0 mb-1">{workspace.name}</h3>
+      )}
       <div className="font-mono text-xs text-muted mb-4">created {formatDate(workspace.created_at)}</div>
 
-      <div className="flex items-center justify-between border-t border-line pt-3">
+      <div className="flex items-center border-t border-line pt-3">
         <Avatar name={ownerName} size={20} />
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            { label: 'Rename', onClick: () => setIsEditing(true) },
+            {
+              label: isDeleting ? 'Deleting…' : 'Delete',
+              destructive: true,
+              onClick: () => {
+                if (!isDeleting) onDelete(workspace.id)
+              },
+            },
+          ]}
+        />
+      )}
     </Card>
   )
-}
+})

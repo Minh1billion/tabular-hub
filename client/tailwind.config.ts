@@ -18,6 +18,11 @@ export default {
         'brand-tint': 'var(--brand-tint)',
         warn: 'var(--warn)',
         'warn-tint': 'var(--warn-tint)',
+        'accent-clay': 'var(--accent-clay)',
+        'accent-gold': 'var(--accent-gold)',
+        'accent-teal': 'var(--accent-teal)',
+        'accent-plum': 'var(--accent-plum)',
+        'accent-olive': 'var(--accent-olive)',
       },
       fontFamily: {
         headline: ['"IBM Plex Sans"', 'sans-serif'],
