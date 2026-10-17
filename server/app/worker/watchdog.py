@@ -5,15 +5,10 @@ from datetime import datetime, timedelta, timezone
 from app.config import settings
 from app.database import SessionLocal
 from app.run.models import Run
-from app.worker.heartbeat import LIVE_STATUSES
+from app.worker.heartbeat import LIVE_STATUSES, aware as _aware
 from app.worker.processor import finalize_run
 
 logger = logging.getLogger("app.worker.watchdog")
-
-def _aware(value: datetime | None) -> datetime | None:
-    if value is not None and value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
 
 def reap_stale_runs(db, *, now: datetime | None = None) -> list[str]:
     """Close runs that nobody is going to finish.

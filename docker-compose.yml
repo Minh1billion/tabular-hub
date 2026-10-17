@@ -88,6 +88,8 @@ services:
     build: ./server
     restart: unless-stopped
     command: ["python", "-m", "app.worker.main"]
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
     env_file:
       - .env
     depends_on:

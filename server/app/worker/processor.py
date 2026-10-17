@@ -11,7 +11,7 @@ from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
-from app.worker.heartbeat import RunHeartbeat
+from app.worker.heartbeat import RunHeartbeat, has_fresh_heartbeat
 
 logger = logging.getLogger("app.worker.processor")
 
@@ -134,6 +134,13 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
         run = db.query(Run).filter(Run.id == run_id).first()
         if run is None or run.status in TERMINAL_STATUSES:
             return True
+
+        if reclaimed and run.status in ("running", "cancelling") and has_fresh_heartbeat(run):
+            # Redelivered while another worker is still alive on it (a long run outlived the
+            # idle window). Leave the message pending instead of executing the run twice;
+            # whichever worker owns the run acks it, or it is re-checked once the heartbeat goes stale.
+            logger.info("run %s is still owned by a live worker, skipping redelivery", run_id)
+            return False
 
         if reclaimed and run.status == "cancelling":
             finalize_run(db, run_id, "cancelled")

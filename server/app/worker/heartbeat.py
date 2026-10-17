@@ -1,6 +1,6 @@
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.config import settings
 from app.database import SessionLocal
@@ -9,6 +9,19 @@ from app.run.models import Run
 logger = logging.getLogger("app.worker.heartbeat")
 
 LIVE_STATUSES = ("running", "cancelling")
+
+def aware(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+def has_fresh_heartbeat(run: Run, now: datetime | None = None) -> bool:
+    """True when some worker refreshed this run's heartbeat recently enough to be presumed alive."""
+    beat = aware(run.heartbeat_at)
+    if beat is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return beat >= now - timedelta(seconds=settings.RUN_STALE_AFTER_SECONDS)
 
 class RunHeartbeat:
     """Refreshes ``runs.heartbeat_at`` from a background thread while a run executes.

@@ -146,3 +146,65 @@ class TestHandleMessage:
         worker_main.handle_message("2-0", {"run_id": "x"}, reclaimed=False)
 
         assert acked == []
+
+class TestLiveOwnerSkip:
+    def _beat(self, db_session, run, seconds_ago):
+        from datetime import datetime, timedelta, timezone
+
+        run.heartbeat_at = datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)
+        db_session.commit()
+
+    def test_redelivery_to_live_owner_is_skipped_and_left_pending(self, db_session, workspace, monkeypatch):
+        run = _make_run(db_session, workspace, status="running", attempt=2)
+        self._beat(db_session, run, seconds_ago=5)
+        monkeypatch.setattr(processor, "_run_events", lambda *a, **k: pytest.fail("must not execute twice"))
+
+        assert process_task(_Lifecycle(), str(run.id), reclaimed=True) is False
+
+        db_session.refresh(run)
+        assert run.status == "running"
+        assert run.attempt == 2
+
+    def test_live_cancelling_run_is_not_finalized_by_another_worker(self, db_session, workspace, monkeypatch):
+        run = _make_run(db_session, workspace, status="cancelling", attempt=2)
+        self._beat(db_session, run, seconds_ago=5)
+
+        assert process_task(_Lifecycle(), str(run.id), reclaimed=True) is False
+
+        db_session.refresh(run)
+        assert run.status == "cancelling"
+
+    def test_stale_heartbeat_allows_takeover(self, db_session, workspace, monkeypatch):
+        run = _make_run(db_session, workspace, status="running", attempt=2)
+        self._beat(db_session, run, seconds_ago=settings.RUN_STALE_AFTER_SECONDS + 30)
+        monkeypatch.setattr(
+            processor,
+            "_run_events",
+            lambda *a, **k: iter([{"event": "completed", "ts": "2026-01-01T00:00:00+00:00", "data": {}}]),
+        )
+
+        assert process_task(_Lifecycle(), str(run.id), reclaimed=True) is True
+
+        db_session.refresh(run)
+        assert run.status == "completed"
+        assert run.attempt == 3
+
+    def test_missing_heartbeat_allows_takeover(self, db_session, workspace, monkeypatch):
+        run = _make_run(db_session, workspace, status="running", attempt=2)
+        monkeypatch.setattr(
+            processor,
+            "_run_events",
+            lambda *a, **k: iter([{"event": "completed", "ts": "2026-01-01T00:00:00+00:00", "data": {}}]),
+        )
+
+        assert process_task(_Lifecycle(), str(run.id), reclaimed=True) is True
+
+    def test_non_reclaimed_delivery_never_skips(self, db_session, workspace, monkeypatch):
+        run = _make_run(db_session, workspace, status="queued")
+        monkeypatch.setattr(
+            processor,
+            "_run_events",
+            lambda *a, **k: iter([{"event": "completed", "ts": "2026-01-01T00:00:00+00:00", "data": {}}]),
+        )
+
+        assert process_task(_Lifecycle(), str(run.id), reclaimed=False) is True
