@@ -11,6 +11,7 @@ from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
+from app.worker.heartbeat import RunHeartbeat
 
 logger = logging.getLogger("app.worker.processor")
 
@@ -153,7 +154,15 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
         updated = (
             db.query(Run)
             .filter(Run.id == run_id, Run.status.in_(statuses))
-            .update({"status": "running", "attempt": Run.attempt + 1}, synchronize_session=False)
+            .update(
+                {
+                    "status": "running",
+                    "attempt": Run.attempt + 1,
+                    "started_at": datetime.now(timezone.utc),
+                    "heartbeat_at": datetime.now(timezone.utc),
+                },
+                synchronize_session=False,
+            )
         )
         db.commit()
         if updated == 0:
@@ -163,43 +172,58 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
         seq = 0
         progress_state: dict[str, tuple[float, float | None]] = {}
 
+        deadline = time.monotonic() + settings.RUN_MAX_SECONDS
         try:
-            events = _run_events(engine_lifecycle, run, run_id)
-            for event in events:
-                persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
-
-                if persist:
-                    db.add(
-                        RunEvent(
-                            run_id=run.id,
-                            attempt=run.attempt,
-                            seq=seq,
-                            event=event["event"],
-                            data=event,
-                            ts=datetime.fromisoformat(event["ts"]),
+            with RunHeartbeat(run.id, run.attempt) as heartbeat:
+                events = _run_events(engine_lifecycle, run, run_id)
+                for event in events:
+                    if heartbeat.lost:
+                        logger.warning("run %s was finalized or taken over elsewhere, abandoning", run_id)
+                        return True
+                    if time.monotonic() > deadline:
+                        finalize_run(
+                            db,
+                            run_id,
+                            "failed",
+                            error=f"Run exceeded the {settings.RUN_MAX_SECONDS}s time limit",
+                            error_type="RunTimeout",
                         )
-                    )
-                    db.commit()
-                    seq += 1
+                        return True
 
-                    if event["event"] == "compiled":
-                        run.execution_id = event["data"]["execution_id"]
-                        db.commit()
-                    elif event["event"] in TERMINAL_STATUSES:
-                        run.status = event["event"]
-                        if event["event"] == "completed" and run.kind == "import":
-                            usage = (
-                                db.query(ResourceUsage)
-                                .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
-                                .first()
+                    persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
+
+                    if persist:
+                        db.add(
+                            RunEvent(
+                                run_id=run.id,
+                                attempt=run.attempt,
+                                seq=seq,
+                                event=event["event"],
+                                data=event,
+                                ts=datetime.fromisoformat(event["ts"]),
                             )
-                            if usage:
-                                usage.size_bytes = run.spec["size_bytes"]
-                            else:
-                                db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                        )
                         db.commit()
+                        seq += 1
 
-                publish_event(str(run.id), event)
+                        if event["event"] == "compiled":
+                            run.execution_id = event["data"]["execution_id"]
+                            db.commit()
+                        elif event["event"] in TERMINAL_STATUSES:
+                            run.status = event["event"]
+                            if event["event"] == "completed" and run.kind == "import":
+                                usage = (
+                                    db.query(ResourceUsage)
+                                    .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
+                                    .first()
+                                )
+                                if usage:
+                                    usage.size_bytes = run.spec["size_bytes"]
+                                else:
+                                    db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                            db.commit()
+
+                    publish_event(str(run.id), event)
         except Exception as exc:
             logger.exception("run %s crashed", run_id)
             db.rollback()

@@ -14,6 +14,7 @@ from app.billing import models as billing_models  # noqa: F401
 from app.resources import models as resources_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
 from app.worker.processor import process_task
+from app.worker.watchdog import Watchdog
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app.worker")
@@ -38,6 +39,8 @@ def run() -> None:
     engine_lifecycle.start()
     ensure_group()
     consumer = f"{socket.gethostname()}-{os.getpid()}"
+    watchdog = Watchdog()
+    watchdog.start()
     try:
         while True:
             try:
@@ -57,6 +60,7 @@ def run() -> None:
             finally:
                 db.close()
     finally:
+        watchdog.stop()
         engine_lifecycle.stop()
 
 if __name__ == "__main__":
