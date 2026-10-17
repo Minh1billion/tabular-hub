@@ -11,7 +11,9 @@ from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
+from app.worker.execution import execute_events
 from app.worker.heartbeat import RunHeartbeat, has_fresh_heartbeat
+from app.worker.isolation import run_in_subprocess
 
 logger = logging.getLogger("app.worker.processor")
 
@@ -106,25 +108,14 @@ def _should_persist_progress(state: dict[str, tuple[float, float | None]], event
     return should_persist
 
 def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
-    bucket = str(run.workspace_id)
-    if run.kind == "import":
-        return engine_lifecycle.engine.data_resource.import_source(
-            key=run.spec["key"],
-            source_kind="s3",
-            source_params={"format": run.spec["format"], **staging.s3_reader_params(run.spec["staging_key"])},
-            bucket=bucket,
-            overwrite=run.spec["overwrite"],
-        )
-    if run.kind == "export":
-        return engine_lifecycle.engine.data_resource.export(
-            key=run.spec["key"],
-            writer_kind="s3",
-            writer_params=staging.s3_writer_params(run.spec["staging_key"]),
-            format=run.spec["format"],
-            bucket=bucket,
-        )
-    return engine_lifecycle.engine.execution.execute(
-        spec=run.spec, bucket=bucket, cancel_check=lambda: is_cancel_requested(run_id)
+    if settings.RUN_ISOLATION == "subprocess":
+        return run_in_subprocess(run_id=run_id, kind=run.kind, spec=run.spec, bucket=str(run.workspace_id))
+    return execute_events(
+        kind=run.kind,
+        spec=run.spec,
+        bucket=str(run.workspace_id),
+        cancel_check=lambda: is_cancel_requested(run_id),
+        lifecycle=engine_lifecycle,
     )
 
 def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool = False) -> bool:

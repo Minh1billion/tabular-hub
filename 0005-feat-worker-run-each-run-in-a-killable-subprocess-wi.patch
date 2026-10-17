@@ -1,0 +1,614 @@
+From 9a52529b261c4a7c7b4efd38f74d95bda34a444b Mon Sep 17 00:00:00 2001
+From: Claude <claude@example.com>
+Date: Sat, 17 Oct 2026 10:41:50 +0000
+Subject: [PATCH 5/5] feat(worker): run each run in a killable subprocess with
+ time limit and forced cancel
+
+---
+ server/app/worker/execution.py           |  41 ++++
+ server/app/worker/isolation.py           | 165 +++++++++++++++
+ server/app/worker/processor.py           |  29 +--
+ server/tests/conftest.py                 |   6 +
+ server/tests/worker/isolation_targets.py |  52 +++++
+ server/tests/worker/test_isolation.py    | 245 +++++++++++++++++++++++
+ 6 files changed, 519 insertions(+), 19 deletions(-)
+ create mode 100644 server/app/worker/execution.py
+ create mode 100644 server/app/worker/isolation.py
+ create mode 100644 server/tests/worker/isolation_targets.py
+ create mode 100644 server/tests/worker/test_isolation.py
+
+diff --git a/server/app/worker/execution.py b/server/app/worker/execution.py
+new file mode 100644
+index 0000000..af9109f
+--- /dev/null
++++ b/server/app/worker/execution.py
+@@ -0,0 +1,41 @@
++from typing import Any, Callable, Iterator
++
++from app.core import staging
++
++def execute_events(
++    *,
++    kind: str,
++    spec: dict[str, Any],
++    bucket: str,
++    cancel_check: Callable[[], bool],
++    lifecycle=None,
++) -> Iterator[dict[str, Any]]:
++    """Run one unit of engine work and stream its events.
++
++    Without ``lifecycle`` the process-wide engine is started on demand, which is
++    what the isolated child process does.
++    """
++    if lifecycle is None:
++        from app.core.engine import engine_lifecycle
++
++        lifecycle = engine_lifecycle
++        lifecycle.start()
++
++    engine = lifecycle.engine
++    if kind == "import":
++        return engine.data_resource.import_source(
++            key=spec["key"],
++            source_kind="s3",
++            source_params={"format": spec["format"], **staging.s3_reader_params(spec["staging_key"])},
++            bucket=bucket,
++            overwrite=spec["overwrite"],
++        )
++    if kind == "export":
++        return engine.data_resource.export(
++            key=spec["key"],
++            writer_kind="s3",
++            writer_params=staging.s3_writer_params(spec["staging_key"]),
++            format=spec["format"],
++            bucket=bucket,
++        )
++    return engine.execution.execute(spec=spec, bucket=bucket, cancel_check=cancel_check)
+diff --git a/server/app/worker/isolation.py b/server/app/worker/isolation.py
+new file mode 100644
+index 0000000..524edce
+--- /dev/null
++++ b/server/app/worker/isolation.py
+@@ -0,0 +1,165 @@
++"""Run engine work in a child process so a stuck run can be killed for real.
++
++Polars and boto3 calls block inside native code, where neither a flag check nor a
++thread interrupt can reach them. The parent keeps the heartbeat, the Redis cancel
++flag and the time limit; the child only executes and streams events back.
++
++Keep the module-level imports stdlib-only: the spawned child imports this module
++before it does anything else.
++"""
++import importlib
++import logging
++import multiprocessing
++import signal
++import time
++from datetime import datetime, timezone
++from typing import Any, Callable, Iterator
++
++logger = logging.getLogger("app.worker.isolation")
++
++DEFAULT_EXECUTOR = "app.worker.execution:execute_events"
++
++_CONTROL = "__control__"
++_TERMINAL = ("completed", "failed", "cancelled")
++
++def _event(name: str, **data: Any) -> dict[str, Any]:
++    return {"event": name, "ts": datetime.now(timezone.utc).isoformat(), **data}
++
++def _resolve(path: str) -> Callable[..., Iterator[dict[str, Any]]]:
++    module, _, attr = path.partition(":")
++    return getattr(importlib.import_module(module), attr)
++
++def _on_sigterm(signum, frame):
++    # SystemExit unwinds through `except BaseException` handlers in the engine, which
++    # abort multipart uploads and delete temp files before the process goes away.
++    raise SystemExit(143)
++
++def _child_main(conn, cancel_event, payload: dict[str, Any]) -> None:
++    signal.signal(signal.SIGTERM, _on_sigterm)
++    try:
++        executor = _resolve(payload["executor"])
++        events = executor(
++            kind=payload["kind"],
++            spec=payload["spec"],
++            bucket=payload["bucket"],
++            cancel_check=cancel_event.is_set,
++        )
++        for event in events:
++            conn.send(event)
++        conn.send({_CONTROL: "done"})
++    except Exception as exc:
++        try:
++            conn.send({_CONTROL: "error", "error": str(exc) or type(exc).__name__, "error_type": type(exc).__name__})
++        except Exception:
++            pass
++    finally:
++        conn.close()
++
++def _stop_process(proc, term_grace: float) -> None:
++    if proc.is_alive():
++        proc.terminate()
++        proc.join(term_grace)
++    if proc.is_alive():
++        proc.kill()
++        proc.join(5)
++
++def run_in_subprocess(
++    *,
++    run_id: str,
++    kind: str,
++    spec: dict[str, Any],
++    bucket: str,
++    max_seconds: float | None = None,
++    cancel_grace: float | None = None,
++    term_grace: float = 5.0,
++    poll_interval: float = 0.5,
++    cancel_requested: Callable[[], bool] | None = None,
++    executor: str = DEFAULT_EXECUTOR,
++) -> Iterator[dict[str, Any]]:
++    from app.config import settings
++
++    if cancel_requested is None:
++        from app.core.queue import is_cancel_requested
++
++        def cancel_requested() -> bool:
++            return is_cancel_requested(run_id)
++
++    max_seconds = settings.RUN_MAX_SECONDS if max_seconds is None else max_seconds
++    cancel_grace = settings.RUN_CANCEL_GRACE_SECONDS if cancel_grace is None else cancel_grace
++
++    ctx = multiprocessing.get_context("spawn")
++    parent_conn, child_conn = ctx.Pipe(duplex=False)
++    cancel_event = ctx.Event()
++    proc = ctx.Process(
++        target=_child_main,
++        args=(child_conn, cancel_event, {"executor": executor, "kind": kind, "spec": spec, "bucket": bucket}),
++        name=f"run-{run_id}",
++        daemon=True,
++    )
++    proc.start()
++    child_conn.close()
++
++    started = time.monotonic()
++    deadline = started + max_seconds
++    cancel_deadline: float | None = None
++    last_check = started
++    terminal_seen = False
++
++    try:
++        while True:
++            now = time.monotonic()
++            if now - last_check >= poll_interval:
++                last_check = now
++                if cancel_deadline is None:
++                    try:
++                        requested = cancel_requested()
++                    except Exception:
++                        logger.warning("cancel check failed for run %s", run_id, exc_info=True)
++                        requested = False
++                    if requested:
++                        cancel_event.set()
++                        cancel_deadline = now + cancel_grace
++                if cancel_deadline is not None and now >= cancel_deadline:
++                    logger.warning("run %s ignored cancellation for %ss, killing it", run_id, cancel_grace)
++                    _stop_process(proc, term_grace)
++                    yield _event("cancelled", data={"execution_id": None, "processed": None, "total": None, "forced": True})
++                    return
++                if now >= deadline:
++                    logger.warning("run %s exceeded %ss, killing it", run_id, max_seconds)
++                    _stop_process(proc, term_grace)
++                    yield _event(
++                        "failed",
++                        error=f"Run exceeded the {max_seconds:g}s time limit and was stopped",
++                        error_type="RunTimeout",
++                    )
++                    return
++
++            if parent_conn.poll(poll_interval):
++                try:
++                    message = parent_conn.recv()
++                except EOFError:
++                    break
++                if isinstance(message, dict) and _CONTROL in message:
++                    if message[_CONTROL] == "done":
++                        break
++                    yield _event("failed", error=message["error"], error_type=message["error_type"])
++                    return
++                yield message
++                if message.get("event") in _TERMINAL:
++                    terminal_seen = True
++                    break
++            elif not proc.is_alive() and not parent_conn.poll(0):
++                break
++
++        proc.join(term_grace)
++        code = proc.exitcode
++        if not terminal_seen and code not in (0, None):
++            hint = " (killed, probably out of memory)" if code == -9 else ""
++            yield _event(
++                "failed",
++                error=f"Run process exited unexpectedly with code {code}{hint}",
++                error_type="ProcessCrashed",
++            )
++    finally:
++        _stop_process(proc, term_grace)
++        parent_conn.close()
+diff --git a/server/app/worker/processor.py b/server/app/worker/processor.py
+index ebe6a33..b8a8fe0 100644
+--- a/server/app/worker/processor.py
++++ b/server/app/worker/processor.py
+@@ -11,7 +11,9 @@ from app.core.queue import clear_cancel, is_cancel_requested, publish_event
+ from app.database import SessionLocal
+ from app.resources.models import ResourceUsage
+ from app.run.models import Run, RunEvent
++from app.worker.execution import execute_events
+ from app.worker.heartbeat import RunHeartbeat, has_fresh_heartbeat
++from app.worker.isolation import run_in_subprocess
+ 
+ logger = logging.getLogger("app.worker.processor")
+ 
+@@ -106,25 +108,14 @@ def _should_persist_progress(state: dict[str, tuple[float, float | None]], event
+     return should_persist
+ 
+ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
+-    bucket = str(run.workspace_id)
+-    if run.kind == "import":
+-        return engine_lifecycle.engine.data_resource.import_source(
+-            key=run.spec["key"],
+-            source_kind="s3",
+-            source_params={"format": run.spec["format"], **staging.s3_reader_params(run.spec["staging_key"])},
+-            bucket=bucket,
+-            overwrite=run.spec["overwrite"],
+-        )
+-    if run.kind == "export":
+-        return engine_lifecycle.engine.data_resource.export(
+-            key=run.spec["key"],
+-            writer_kind="s3",
+-            writer_params=staging.s3_writer_params(run.spec["staging_key"]),
+-            format=run.spec["format"],
+-            bucket=bucket,
+-        )
+-    return engine_lifecycle.engine.execution.execute(
+-        spec=run.spec, bucket=bucket, cancel_check=lambda: is_cancel_requested(run_id)
++    if settings.RUN_ISOLATION == "subprocess":
++        return run_in_subprocess(run_id=run_id, kind=run.kind, spec=run.spec, bucket=str(run.workspace_id))
++    return execute_events(
++        kind=run.kind,
++        spec=run.spec,
++        bucket=str(run.workspace_id),
++        cancel_check=lambda: is_cancel_requested(run_id),
++        lifecycle=engine_lifecycle,
+     )
+ 
+ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool = False) -> bool:
+diff --git a/server/tests/conftest.py b/server/tests/conftest.py
+index 480a822..70a8526 100644
+--- a/server/tests/conftest.py
++++ b/server/tests/conftest.py
+@@ -10,6 +10,12 @@ os.environ.setdefault("GITHUB_CLIENT_SECRET", "test")
+ os.environ.setdefault("OAUTH_REDIRECT_BASE_URL", "http://testserver")
+ os.environ.setdefault("FRONTEND_URL", "http://testserver")
+ os.environ.setdefault("ENGINE_BACKEND", "local")
++os.environ.setdefault("RUN_ISOLATION", "inproc")
++os.environ.setdefault("STRIPE_SECRET_KEY", "test")
++os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "test")
++os.environ.setdefault("STRIPE_PUBLISHABLE_KEY", "test")
++os.environ.setdefault("STRIPE_PRICE_ID_PRO", "test")
++os.environ.setdefault("STRIPE_PRICE_ID_TEAM", "test")
+ os.environ.setdefault("STAGING_S3_ENDPOINT_URL", "http://localhost:9000")
+ os.environ.setdefault("STAGING_S3_ACCESS_KEY_ID", "test")
+ os.environ.setdefault("STAGING_S3_SECRET_ACCESS_KEY", "test")
+diff --git a/server/tests/worker/isolation_targets.py b/server/tests/worker/isolation_targets.py
+new file mode 100644
+index 0000000..1fe6445
+--- /dev/null
++++ b/server/tests/worker/isolation_targets.py
+@@ -0,0 +1,52 @@
++"""Executors that the isolation tests run inside a spawned child process."""
++import os
++import signal
++import time
++from datetime import datetime, timezone
++
++def _ev(name, **data):
++    return {"event": name, "ts": datetime.now(timezone.utc).isoformat(), **data}
++
++def quick(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    yield _ev("completed", data={"execution_id": "x", "leaves": [], "kind": kind, "bucket": bucket})
++
++def hang(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    time.sleep(600)
++
++def deaf_to_cancel(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    time.sleep(600)
++
++def polite(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    while not cancel_check():
++        time.sleep(0.02)
++    yield _ev("cancelled", data={"execution_id": "x", "processed": 0, "total": 1})
++
++def crash(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    raise ValueError("kaboom")
++
++def killed(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++    os._exit(9)
++
++def stubborn(*, kind, spec, bucket, cancel_check):
++    signal.signal(signal.SIGTERM, signal.SIG_IGN)
++    yield _ev("running", total_nodes=1)
++    time.sleep(600)
++
++def silent_exit(*, kind, spec, bucket, cancel_check):
++    yield _ev("running", total_nodes=1)
++
++def cleanup_on_term(*, kind, spec, bucket, cancel_check):
++    marker = spec["marker"]
++    yield _ev("running", total_nodes=1)
++    try:
++        time.sleep(600)
++    except BaseException:
++        with open(marker, "w") as fh:
++            fh.write("cleaned")
++        raise
+diff --git a/server/tests/worker/test_isolation.py b/server/tests/worker/test_isolation.py
+new file mode 100644
+index 0000000..50b74ca
+--- /dev/null
++++ b/server/tests/worker/test_isolation.py
+@@ -0,0 +1,245 @@
++import os
++import sys
++import time
++import uuid
++
++import polars as pl
++import pytest
++
++sys.path.insert(0, os.path.dirname(__file__))
++
++from app.worker.isolation import run_in_subprocess
++
++TARGETS = "isolation_targets"
++
++class _Lifecycle:
++    def touch_bucket(self, bucket):
++        pass
++
++def _run(executor, **overrides):
++    kwargs = dict(
++        run_id=str(uuid.uuid4()),
++        kind="pipeline",
++        spec={},
++        bucket="b",
++        max_seconds=20,
++        cancel_grace=20,
++        term_grace=1,
++        poll_interval=0.05,
++        cancel_requested=lambda: False,
++        executor=f"{TARGETS}:{executor}",
++    )
++    kwargs.update(overrides)
++    return list(run_in_subprocess(**kwargs))
++
++def _names(events):
++    return [e["event"] for e in events]
++
++class TestEventStreaming:
++    def test_events_are_forwarded_in_order(self):
++        events = _run("quick")
++
++        assert _names(events) == ["running", "completed"]
++        assert events[-1]["data"]["bucket"] == "b"
++
++    def test_exception_in_child_becomes_failed_event(self):
++        events = _run("crash")
++
++        assert _names(events) == ["running", "failed"]
++        assert events[-1]["error"] == "kaboom"
++        assert events[-1]["error_type"] == "ValueError"
++
++    def test_child_killed_hard_reports_process_crash(self):
++        events = _run("killed")
++
++        assert events[-1]["event"] == "failed"
++        assert events[-1]["error_type"] == "ProcessCrashed"
++
++    def test_child_exiting_cleanly_without_terminal_event_yields_nothing_extra(self):
++        events = _run("silent_exit")
++
++        assert _names(events) == ["running"]
++
++class TestTimeout:
++    def test_hung_child_is_killed_at_the_time_limit(self):
++        started = time.monotonic()
++        events = _run("hang", max_seconds=1.0)
++
++        assert events[-1]["event"] == "failed"
++        assert events[-1]["error_type"] == "RunTimeout"
++        assert time.monotonic() - started < 15
++
++    def test_child_ignoring_sigterm_is_escalated_to_sigkill(self):
++        started = time.monotonic()
++        events = _run("stubborn", max_seconds=1.0, term_grace=0.5)
++
++        assert events[-1]["error_type"] == "RunTimeout"
++        assert time.monotonic() - started < 15
++
++    def test_sigterm_lets_the_child_clean_up_first(self, tmp_path):
++        marker = tmp_path / "marker"
++
++        _run("cleanup_on_term", spec={"marker": str(marker)}, max_seconds=1.5, term_grace=3)
++
++        assert marker.read_text() == "cleaned"
++
++class TestCancel:
++    def test_cooperative_child_cancels_gracefully(self):
++        events = _run("polite", cancel_requested=lambda: True)
++
++        assert events[-1]["event"] == "cancelled"
++        assert "forced" not in events[-1]["data"]
++
++    def test_child_that_ignores_cancel_is_killed_after_grace(self):
++        started = time.monotonic()
++        events = _run("deaf_to_cancel", cancel_requested=lambda: True, cancel_grace=0.5)
++
++        assert events[-1]["event"] == "cancelled"
++        assert events[-1]["data"]["forced"] is True
++        assert time.monotonic() - started < 15
++
++    def test_cancel_check_errors_do_not_break_the_run(self):
++        def flaky():
++            raise ConnectionError("redis down")
++
++        events = _run("quick", cancel_requested=flaky)
++
++        assert _names(events) == ["running", "completed"]
++
++class TestCleanup:
++    def test_closing_the_generator_kills_the_child(self):
++        gen = run_in_subprocess(
++            run_id="r",
++            kind="pipeline",
++            spec={},
++            bucket="b",
++            max_seconds=60,
++            term_grace=1,
++            poll_interval=0.05,
++            cancel_requested=lambda: False,
++            executor=f"{TARGETS}:hang",
++        )
++        assert next(gen)["event"] == "running"
++
++        import multiprocessing
++
++        children = multiprocessing.active_children()
++        assert children
++
++        gen.close()
++
++        assert all(not c.is_alive() for c in children)
++
++class TestRealEngine:
++    def test_default_executor_runs_a_pipeline_in_a_child(self, tmp_path, monkeypatch):
++        from tabular_manner.engine.application.io.resource_storage import ResourceStorage
++        from tabular_manner.engine.infrastructure.resource_storage.local_resource_storage_repository import (
++            LocalResourceStorageRepository,
++        )
++
++        storage_root = tmp_path / ".tm"
++        monkeypatch.setenv("ENGINE_STORAGE_ROOT", str(storage_root))
++        bucket = str(uuid.uuid4())
++        ResourceStorage(repository=LocalResourceStorageRepository(root=str(storage_root), namespace=".resource")).save(
++            "raw", pl.DataFrame({"customer": ["a", "b"], "amount": [10.0, 20.0]}).lazy(), bucket=bucket
++        )
++        spec = {
++            "nodes": [
++                {"id": "1", "type": "fetch_internal", "name": "Fetch", "params": {"key": "raw"}},
++                {"id": "2", "type": "select", "name": "Select", "params": {"columns": ["customer"]}},
++            ],
++            "connections": [{"from": "1", "to": "2"}],
++        }
++
++        events = list(
++            run_in_subprocess(
++                run_id="real",
++                kind="pipeline",
++                spec=spec,
++                bucket=bucket,
++                max_seconds=120,
++                cancel_grace=10,
++                poll_interval=0.1,
++                cancel_requested=lambda: False,
++            )
++        )
++
++        assert events[-1]["event"] == "completed", events[-1]
++        assert events[-1]["data"]["leaves"][0]["columns"] == ["customer"]
++
++
++class TestProcessTaskIsolation:
++    @pytest.fixture
++    def workspace(self, db_session, test_user):
++        from app.workspace.models import Workspace
++
++        ws = Workspace(name="Isolation WS", owner_id=test_user.id)
++        db_session.add(ws)
++        db_session.commit()
++        db_session.refresh(ws)
++        return ws
++
++    def _run_row(self, db_session, workspace):
++        from app.run.models import Run
++
++        run = Run(
++            workspace_id=workspace.id,
++            spec={"nodes": [], "connections": []},
++            status="queued",
++            idempotency_key=str(uuid.uuid4()),
++        )
++        db_session.add(run)
++        db_session.commit()
++        db_session.refresh(run)
++        return run
++
++    def _use(self, monkeypatch, executor, **kwargs):
++        import functools
++
++        import app.worker.processor as processor
++        from app.config import settings
++
++        monkeypatch.setattr(settings, "RUN_ISOLATION", "subprocess")
++        monkeypatch.setattr(
++            processor,
++            "run_in_subprocess",
++            functools.partial(run_in_subprocess, executor=f"{TARGETS}:{executor}", term_grace=1, poll_interval=0.05, **kwargs),
++        )
++
++    def test_hung_run_is_killed_and_marked_failed(self, db_session, workspace, monkeypatch):
++        from app.run.models import RunEvent
++        from app.worker.processor import process_task
++
++        run = self._run_row(db_session, workspace)
++        self._use(monkeypatch, "hang", max_seconds=1.0)
++
++        assert process_task(_Lifecycle(), str(run.id)) is True
++
++        db_session.refresh(run)
++        assert run.status == "failed"
++        last = db_session.query(RunEvent).filter(RunEvent.run_id == run.id).order_by(RunEvent.seq.desc()).first()
++        assert last.data["error_type"] == "RunTimeout"
++
++    def test_cancelling_a_deaf_run_force_kills_it(self, db_session, workspace, monkeypatch):
++        from app.core.queue import request_cancel
++        from app.worker.processor import process_task
++
++        run = self._run_row(db_session, workspace)
++        request_cancel(str(run.id))
++        self._use(monkeypatch, "deaf_to_cancel", max_seconds=60, cancel_grace=0.3)
++
++        assert process_task(_Lifecycle(), str(run.id)) is True
++
++        db_session.refresh(run)
++        assert run.status == "cancelled"
++
++    def test_crashing_child_marks_run_failed(self, db_session, workspace, monkeypatch):
++        from app.worker.processor import process_task
++
++        run = self._run_row(db_session, workspace)
++        self._use(monkeypatch, "killed", max_seconds=60)
++
++        process_task(_Lifecycle(), str(run.id))
++
++        db_session.refresh(run)
++        assert run.status == "failed"
+-- 
+2.43.0
+
