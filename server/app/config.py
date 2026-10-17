@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     RUN_PROGRESS_PERSIST_MIN_INTERVAL_SECONDS: float = 2.0
     RUN_PROGRESS_PERSIST_MIN_PERCENT: float = 5.0
 
+    RUN_MAX_SECONDS: int = 3600
+    RUN_MAX_ATTEMPTS: int = 3
+    RUN_HEARTBEAT_INTERVAL_SECONDS: float = 10.0
+    RUN_STALE_AFTER_SECONDS: int = 90
+    RUN_CANCEL_GRACE_SECONDS: float = 30.0
+    RUN_ISOLATION: str = "subprocess"
+
     STAGING_S3_BUCKET_NAME: str = "tm-staging"
     STAGING_S3_REGION: str = "us-east-1"
     STAGING_S3_ENDPOINT_URL: str | None = None

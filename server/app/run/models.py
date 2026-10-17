@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -10,6 +10,7 @@ class Run(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "runs"
     __table_args__ = (
         UniqueConstraint("workspace_id", "idempotency_key", name="uq_run_workspace_idempotency_key"),
+        Index("ix_runs_status_heartbeat_at", "status", "heartbeat_at"),
     )
 
     workspace_id = Column(GUID(), ForeignKey("workspaces.id"), nullable=False)
@@ -20,6 +21,8 @@ class Run(Base, UUIDPKMixin, TimestampMixin):
     idempotency_key = Column(String, nullable=False)
     attempt = Column(Integer, nullable=False, default=1)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    heartbeat_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
