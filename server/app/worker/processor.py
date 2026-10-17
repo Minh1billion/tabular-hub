@@ -1,5 +1,8 @@
+import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+
+from sqlalchemy import func
 
 from app.config import settings
 from app.core import staging
@@ -8,6 +11,72 @@ from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
+
+logger = logging.getLogger("app.worker.processor")
+
+TERMINAL_STATUSES = ("completed", "failed", "cancelled")
+
+def _next_seq(db, run: Run) -> int:
+    last = (
+        db.query(func.max(RunEvent.seq))
+        .filter(RunEvent.run_id == run.id, RunEvent.attempt == run.attempt)
+        .scalar()
+    )
+    return 0 if last is None else last + 1
+
+def _cleanup_after_terminal(run: Run, run_id: str) -> None:
+    try:
+        clear_cancel(run_id)
+    except Exception:
+        logger.warning("failed to clear cancel flag for run %s", run_id, exc_info=True)
+    if run.kind == "import":
+        try:
+            staging.delete(run.spec["staging_key"])
+        except Exception:
+            logger.warning("failed to delete staging object for run %s", run_id, exc_info=True)
+
+def finalize_run(
+    db,
+    run_id: str,
+    status: str,
+    *,
+    error: str | None = None,
+    error_type: str | None = None,
+) -> bool:
+    """Move a non-terminal run to a terminal status and tell subscribers.
+
+    Returns False when the run was already terminal (or missing), so callers
+    can use it as a compare-and-set.
+    """
+    now = datetime.now(timezone.utc)
+    values: dict = {"status": status}
+    if status == "cancelled":
+        values["cancelled_at"] = now
+
+    updated = (
+        db.query(Run)
+        .filter(Run.id == run_id, Run.status.notin_(TERMINAL_STATUSES))
+        .update(values, synchronize_session=False)
+    )
+    if updated == 0:
+        db.rollback()
+        return False
+
+    run = db.query(Run).filter(Run.id == run_id).first()
+    event: dict = {"event": status, "ts": now.isoformat()}
+    if error is not None:
+        event["error"] = error
+        event["error_type"] = error_type or "RunError"
+
+    db.add(RunEvent(run_id=run.id, attempt=run.attempt, seq=_next_seq(db, run), event=status, data=event, ts=now))
+    db.commit()
+
+    try:
+        publish_event(str(run.id), event)
+    except Exception:
+        logger.warning("failed to publish %s event for run %s", status, run_id, exc_info=True)
+    _cleanup_after_terminal(run, str(run.id))
+    return True
 
 def _should_persist_progress(state: dict[str, tuple[float, float | None]], event: dict) -> bool:
     node_id = event.get("node_id")
@@ -59,7 +128,27 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
 
 def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool = False) -> bool:
     db = SessionLocal()
+    events = None
     try:
+        run = db.query(Run).filter(Run.id == run_id).first()
+        if run is None or run.status in TERMINAL_STATUSES:
+            return True
+
+        if reclaimed and run.status == "cancelling":
+            finalize_run(db, run_id, "cancelled")
+            return True
+
+        # `attempt` starts at 1 before any execution, so executions made so far = attempt - 1.
+        if reclaimed and run.status == "running" and run.attempt - 1 >= settings.RUN_MAX_ATTEMPTS:
+            finalize_run(
+                db,
+                run_id,
+                "failed",
+                error=f"Run abandoned after {settings.RUN_MAX_ATTEMPTS} attempts without finishing",
+                error_type="MaxAttemptsExceeded",
+            )
+            return True
+
         statuses = ["queued", "running"] if reclaimed else ["queued"]
         updated = (
             db.query(Run)
@@ -74,46 +163,66 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
         seq = 0
         progress_state: dict[str, tuple[float, float | None]] = {}
 
-        for event in _run_events(engine_lifecycle, run, run_id):
-            persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
+        try:
+            events = _run_events(engine_lifecycle, run, run_id)
+            for event in events:
+                persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
 
-            if persist:
-                db.add(
-                    RunEvent(
-                        run_id=run.id,
-                        attempt=run.attempt,
-                        seq=seq,
-                        event=event["event"],
-                        data=event,
-                        ts=datetime.fromisoformat(event["ts"]),
-                    )
-                )
-                db.commit()
-                seq += 1
-
-                if event["event"] == "compiled":
-                    run.execution_id = event["data"]["execution_id"]
-                    db.commit()
-                elif event["event"] in ("completed", "failed", "cancelled"):
-                    run.status = event["event"]
-                    if event["event"] == "completed" and run.kind == "import":
-                        usage = (
-                            db.query(ResourceUsage)
-                            .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
-                            .first()
+                if persist:
+                    db.add(
+                        RunEvent(
+                            run_id=run.id,
+                            attempt=run.attempt,
+                            seq=seq,
+                            event=event["event"],
+                            data=event,
+                            ts=datetime.fromisoformat(event["ts"]),
                         )
-                        if usage:
-                            usage.size_bytes = run.spec["size_bytes"]
-                        else:
-                            db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                    )
                     db.commit()
+                    seq += 1
 
-            publish_event(str(run.id), event)
+                    if event["event"] == "compiled":
+                        run.execution_id = event["data"]["execution_id"]
+                        db.commit()
+                    elif event["event"] in TERMINAL_STATUSES:
+                        run.status = event["event"]
+                        if event["event"] == "completed" and run.kind == "import":
+                            usage = (
+                                db.query(ResourceUsage)
+                                .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
+                                .first()
+                            )
+                            if usage:
+                                usage.size_bytes = run.spec["size_bytes"]
+                            else:
+                                db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                        db.commit()
 
-        clear_cancel(run_id)
+                publish_event(str(run.id), event)
+        except Exception as exc:
+            logger.exception("run %s crashed", run_id)
+            db.rollback()
+            finalize_run(db, run_id, "failed", error=str(exc) or type(exc).__name__, error_type=type(exc).__name__)
+            return True
+
+        db.refresh(run)
+        if run.status not in TERMINAL_STATUSES:
+            if run.status == "cancelling":
+                finalize_run(db, run_id, "cancelled")
+            else:
+                finalize_run(
+                    db,
+                    run_id,
+                    "failed",
+                    error="Engine stopped without reporting a result",
+                    error_type="MissingTerminalEvent",
+                )
+        else:
+            _cleanup_after_terminal(run, run_id)
         engine_lifecycle.touch_bucket(str(run.workspace_id))
-        if run.kind == "import":
-            staging.delete(run.spec["staging_key"])
         return True
     finally:
+        if events is not None and hasattr(events, "close"):
+            events.close()
         db.close()
