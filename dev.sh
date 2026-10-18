@@ -59,6 +59,8 @@ else
   FORWARD_HOST="host.docker.internal"
 fi
 
+STRIPE_EVENTS="checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,invoice.payment_failed"
+
 cleanup() {
   echo
   echo "==> Stopping Stripe CLI listener..."
@@ -74,4 +76,5 @@ docker run --rm -it \
   stripe/stripe-cli:latest \
   listen \
   --api-key "${STRIPE_SECRET_KEY}" \
+  --events "${STRIPE_EVENTS}" \
   --forward-to "${FORWARD_HOST}:8000/billing/webhook/stripe"

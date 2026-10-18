@@ -1,11 +1,39 @@
+import time
 from datetime import datetime
 
+from app.config import settings
 from app.core import staging
 from app.core.engine import EngineLifecycle
 from app.core.queue import clear_cancel, is_cancel_requested, publish_event
 from app.database import SessionLocal
 from app.resources.models import ResourceUsage
 from app.run.models import Run, RunEvent
+
+def _should_persist_progress(state: dict[str, tuple[float, float | None]], event: dict) -> bool:
+    node_id = event.get("node_id")
+    if node_id is None:
+        return True
+
+    now = time.monotonic()
+    processed = event.get("rows_processed")
+    total = event.get("rows_total")
+    percent = (processed / total * 100) if processed is not None and total else None
+
+    last = state.get(node_id)
+    if last is None:
+        state[node_id] = (now, percent)
+        return True
+
+    last_ts, last_percent = last
+    elapsed = now - last_ts
+    percent_delta = percent - last_percent if percent is not None and last_percent is not None else None
+
+    should_persist = elapsed >= settings.RUN_PROGRESS_PERSIST_MIN_INTERVAL_SECONDS or (
+        percent_delta is not None and percent_delta >= settings.RUN_PROGRESS_PERSIST_MIN_PERCENT
+    )
+    if should_persist:
+        state[node_id] = (now, percent)
+    return should_persist
 
 def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
     bucket = str(run.workspace_id)
@@ -44,37 +72,41 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
 
         run = db.query(Run).filter(Run.id == run_id).first()
         seq = 0
+        progress_state: dict[str, tuple[float, float | None]] = {}
 
         for event in _run_events(engine_lifecycle, run, run_id):
-            db.add(
-                RunEvent(
-                    run_id=run.id,
-                    attempt=run.attempt,
-                    seq=seq,
-                    event=event["event"],
-                    data=event,
-                    ts=datetime.fromisoformat(event["ts"]),
-                )
-            )
-            db.commit()
-            seq += 1
+            persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
 
-            if event["event"] == "compiled":
-                run.execution_id = event["data"]["execution_id"]
-                db.commit()
-            elif event["event"] in ("completed", "failed", "cancelled"):
-                run.status = event["event"]
-                if event["event"] == "completed" and run.kind == "import":
-                    usage = (
-                        db.query(ResourceUsage)
-                        .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
-                        .first()
+            if persist:
+                db.add(
+                    RunEvent(
+                        run_id=run.id,
+                        attempt=run.attempt,
+                        seq=seq,
+                        event=event["event"],
+                        data=event,
+                        ts=datetime.fromisoformat(event["ts"]),
                     )
-                    if usage:
-                        usage.size_bytes = run.spec["size_bytes"]
-                    else:
-                        db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                )
                 db.commit()
+                seq += 1
+
+                if event["event"] == "compiled":
+                    run.execution_id = event["data"]["execution_id"]
+                    db.commit()
+                elif event["event"] in ("completed", "failed", "cancelled"):
+                    run.status = event["event"]
+                    if event["event"] == "completed" and run.kind == "import":
+                        usage = (
+                            db.query(ResourceUsage)
+                            .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
+                            .first()
+                        )
+                        if usage:
+                            usage.size_bytes = run.spec["size_bytes"]
+                        else:
+                            db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                    db.commit()
 
             publish_event(str(run.id), event)
 

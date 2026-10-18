@@ -1,6 +1,8 @@
 import { useSearchParams } from 'react-router-dom'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
+import { PageHead } from '@/shared/components/ui/PageHead'
 import { Button } from '@/shared/components/ui/Button'
+import { AlertIcon } from '@/shared/components/ui/icons'
 import { useCheckout, usePlans, usePortal, useSubscription } from '../hooks'
 import { PlanCard } from '../components/PlanCard'
 import { UsageMeter } from '../components/UsageMeter'
@@ -20,23 +22,22 @@ export function BillingPage() {
 
   if (subscriptionLoading || plansLoading || !subscription || !plans) {
     return (
-      <div className="relative px-10 py-8">
-        <GridPattern cellSize={28} />
-        <div className="relative max-w-6xl mx-auto animate-pulse">
-          <div className="h-6 w-24 bg-cream-soft rounded mb-1.5" />
-          <div className="h-4 w-72 bg-cream-soft rounded mb-6" />
-          <div className="flex gap-6">
-            <div className="flex flex-col gap-6 flex-1">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="h-[300px] bg-cream-soft border-2 border-black rounded-card" />
-                <div className="h-[300px] bg-cream-soft border-2 border-black rounded-card" />
-                <div className="h-[300px] bg-cream-soft border-2 border-black rounded-card" />
+      <div className="pg">
+        <GridPattern cellSize={28} className="pg-grid" />
+        <div className="pg-body bl-skel">
+          <PageHead kicker="Billing" title="Billing" subtitle="Manage your plan, usage, and payment details." />
+          <div className="bl-layout">
+            <div className="bl-main">
+              <div className="plans">
+                {[0, 1, 2].map((index) => (
+                  <div key={index} className="skeleton" style={{ height: 300 }} />
+                ))}
               </div>
-              <div className="h-[180px] bg-cream-soft border-2 border-black rounded-card" />
+              <div className="skeleton" style={{ height: 170 }} />
             </div>
-            <div className="flex flex-col gap-6 w-[320px] shrink-0">
-              <div className="h-[300px] bg-cream-soft border-2 border-black rounded-card" />
-              <div className="h-[180px] bg-cream-soft border-2 border-black rounded-card" />
+            <div className="bl-aside">
+              <div className="skeleton" style={{ height: 260 }} />
+              <div className="skeleton" style={{ height: 140 }} />
             </div>
           </div>
         </div>
@@ -44,41 +45,47 @@ export function BillingPage() {
     )
   }
 
-  return (
-    <div className="relative px-10 py-8">
-      <GridPattern cellSize={28} />
+  const featuredTier = plans.find((plan) => plan.tier === 'pro')?.tier
 
-      <div className="relative max-w-6xl mx-auto">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="font-headline font-semibold text-[22px] mb-1.5">Billing</h2>
-            <p className="text-[13.5px] text-slate">Manage your plan, usage, and payment details.</p>
-          </div>
-          {subscription.tier !== 'free' && (
-            <Button variant="outline" size="sm" onClick={() => portal.mutate()} disabled={portal.isPending}>
-              {portal.isPending ? 'Opening…' : 'Manage billing'}
-            </Button>
-          )}
-        </div>
+  return (
+    <div className="pg">
+      <GridPattern cellSize={28} className="pg-grid" />
+
+      <div className="pg-body">
+        <PageHead
+          kicker="Billing"
+          title="Billing"
+          subtitle="Manage your plan, usage, and payment details."
+          actions={
+            subscription.tier !== 'free' && (
+              <Button variant="outline" size="sm" onClick={() => portal.mutate()} loading={portal.isPending}>
+                {portal.isPending ? 'Opening…' : 'Manage billing'}
+              </Button>
+            )
+          }
+        />
 
         {checkoutResult === 'cancel' && (
-          <div className="mb-6 px-4 py-3 rounded-lg bg-warn-tint text-warn text-sm">
+          <div className="note-bar rise">
+            <AlertIcon />
             Checkout was cancelled.
           </div>
         )}
         {subscription.status === 'past_due' && (
-          <div className="mb-6 px-4 py-3 rounded-lg bg-warn-tint text-warn text-sm">
+          <div className="note-bar rise">
+            <AlertIcon />
             Your last payment failed. Update your payment method to avoid losing access to your plan.
           </div>
         )}
 
-        <div className="flex gap-6">
-          <div className="flex flex-col gap-6 flex-1">
-            <div className="grid grid-cols-3 gap-4">
+        <div className="bl-layout">
+          <div className="bl-main">
+            <div className="plans stagger">
               {plans.map((plan) => (
                 <PlanCard
                   key={plan.tier}
                   plan={plan}
+                  featured={plan.tier === featuredTier}
                   isCurrent={subscription.tier === plan.tier}
                   isDowngrade={TIER_ORDER.indexOf(plan.tier) < TIER_ORDER.indexOf(subscription.tier)}
                   onUpgrade={() => checkout.mutate(plan.tier)}
@@ -87,32 +94,20 @@ export function BillingPage() {
               ))}
             </div>
 
-            <div className="bg-white border-2 border-black rounded-card p-5 flex flex-col gap-5 flex-1">
-              <h3 className="font-headline font-semibold text-[15px]">Usage</h3>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-                <UsageMeter
-                  label="Workspaces"
-                  used={subscription.workspace_count}
-                  max={subscription.max_workspaces}
-                  formatValue={(value) => String(value)}
-                />
-                <UsageMeter
-                  label="Storage"
-                  used={subscription.storage_used_bytes}
-                  max={subscription.max_total_storage_bytes}
-                  formatValue={formatBytes}
-                />
+            <section className="panel usage rise">
+              <h3>Usage</h3>
+              <div className="usage-grid">
+                <UsageMeter label="Workspaces" used={subscription.workspace_count} max={subscription.max_workspaces} formatValue={(value) => String(value)} />
+                <UsageMeter label="Storage" used={subscription.storage_used_bytes} max={subscription.max_total_storage_bytes} formatValue={formatBytes} />
               </div>
-              <p className="text-xs text-muted">
-                Max file size on your plan: {formatBytes(subscription.max_resource_size_bytes)}
-              </p>
-            </div>
+              <p className="usage-note">Max file size on your plan: {formatBytes(subscription.max_resource_size_bytes)}</p>
+            </section>
           </div>
 
-          <div className="flex flex-col gap-6 w-[320px] shrink-0">
+          <aside className="bl-aside rise">
             <NeedHelpCard />
             <ReportIssueCard />
-          </div>
+          </aside>
         </div>
       </div>
     </div>
