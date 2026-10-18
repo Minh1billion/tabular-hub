@@ -1,5 +1,10 @@
-import { PointerEvent as ReactPointerEvent, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
+import { Toggle } from '@/shared/components/ui/Toggle'
+import { Badge } from '@/shared/components/ui/Badge'
+import { Select } from '@/shared/components/ui/Select'
+import { TableIcon } from '@/shared/components/ui/icons'
+import { CategoryIcon } from '../category'
 import { NodeDescriptor } from '@/modules/editor/types'
 import { useResources } from '@/modules/resources/hooks'
 import { GraphNode } from '../../types'
@@ -8,9 +13,9 @@ interface NodeInspectorProps {
   workspaceId: string
   node: GraphNode
   descriptor?: NodeDescriptor
+  category?: string
   onChange: (params: Record<string, unknown>) => void
   onRename: (name: string) => void
-  onClose: () => void
 }
 
 const RESOURCE_KEY_DROPDOWN_NODE_TYPES = new Set(['fetch_internal'])
@@ -69,6 +74,7 @@ function validateText(text: string, typeName: string): string | null {
 function ParamField({
   fieldName,
   typeName,
+  required,
   text,
   error,
   checked,
@@ -77,6 +83,7 @@ function ParamField({
 }: {
   fieldName: string
   typeName: string
+  required: boolean
   text: string
   error?: string
   checked: boolean
@@ -85,59 +92,38 @@ function ParamField({
 }) {
   if (typeName === 'bool') {
     return (
-      <label className="flex items-center gap-2 text-[13px] text-ink">
-        <input type="checkbox" checked={checked} onChange={(event) => onCheckedChange(event.target.checked)} />
-        {fieldName}
-      </label>
+      <div className="field">
+        <span className="field-label">{fieldName}</span>
+        <Toggle on={checked} onChange={onCheckedChange} label={checked ? 'Enabled' : 'Disabled'} />
+      </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-mono text-muted uppercase">{fieldName}</label>
-      <Input value={text} onChange={(event) => onTextChange(event.target.value)} placeholder={typeName} />
-      {error && <span className="text-[11px] text-warn">{error}</span>}
+    <div className="field">
+      <label className="field-label">
+        {fieldName}
+        {required && <i>*</i>}
+      </label>
+      <Input value={text} onChange={(e) => onTextChange(e.target.value)} placeholder={typeName} />
+      {error && <span className="err">{error}</span>}
     </div>
   )
 }
 
-export function NodeInspector({ workspaceId, node, descriptor, onChange, onRename, onClose }: NodeInspectorProps) {
+export function NodeInspector({ workspaceId, node, descriptor, category = 'Transform', onChange, onRename }: NodeInspectorProps) {
   const usesResourceKeyDropdown = RESOURCE_KEY_DROPDOWN_NODE_TYPES.has(node.type)
-  const { data: resources } = useResources(workspaceId)
+  const { data: resources, isLoading: isLoadingResources } = useResources(workspaceId)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(node.name)
-  const dragging = useRef(false)
 
   function submitRename() {
     const trimmed = nameDraft.trim()
     setIsEditingName(false)
     if (trimmed && trimmed !== node.name) onRename(trimmed)
     else setNameDraft(node.name)
-  }
-
-  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    event.preventDefault()
-    dragging.current = true
-    const startX = event.clientX
-    const startY = event.clientY
-    const start = offset
-
-    function onMove(moveEvent: PointerEvent) {
-      if (!dragging.current) return
-      setOffset({ x: start.x + (moveEvent.clientX - startX), y: start.y + (moveEvent.clientY - startY) })
-    }
-
-    function onUp() {
-      dragging.current = false
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
   }
 
   function setParam(fieldName: string, value: unknown) {
@@ -151,27 +137,24 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onRenam
     if (!error) setParam(fieldName, textToFieldValue(text, typeName))
   }
 
-  function renderField(fieldName: string, typeName: string) {
+  function renderField(fieldName: string, typeName: string, required: boolean) {
     if (fieldName === 'bucket') return null
 
     if (usesResourceKeyDropdown && fieldName === 'key') {
       return (
-        <div key={fieldName} className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">{fieldName}</label>
-          <select
-            className="w-full px-3 py-2 text-sm border border-line rounded-lg bg-white text-ink outline-none focus:border-brand transition-colors"
+        <div key={fieldName} className="field">
+          <label className="field-label">
+            {fieldName}
+            {required && <i>*</i>}
+          </label>
+          <Select
             value={typeof node.params[fieldName] === 'string' ? (node.params[fieldName] as string) : ''}
-            onChange={(event) => setParam(fieldName, event.target.value)}
-          >
-            <option value="" disabled>
-              Select a resource
-            </option>
-            {(resources?.keys ?? []).map((resourceKey) => (
-              <option key={resourceKey} value={resourceKey}>
-                {resourceKey}
-              </option>
-            ))}
-          </select>
+            options={(resources?.keys ?? []).map((resourceKey) => ({ value: resourceKey, label: resourceKey, icon: <TableIcon /> }))}
+            onChange={(value) => setParam(fieldName, value)}
+            placeholder="Select a resource"
+            emptyText="No datasets yet — import one from the Resources tab"
+            loading={isLoadingResources}
+          />
         </div>
       )
     }
@@ -183,6 +166,7 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onRenam
         key={fieldName}
         fieldName={fieldName}
         typeName={typeName}
+        required={required}
         text={text}
         error={errors[fieldName]}
         checked={Boolean(node.params[fieldName])}
@@ -192,65 +176,55 @@ export function NodeInspector({ workspaceId, node, descriptor, onChange, onRenam
     )
   }
 
+  const required = descriptor ? Object.entries(descriptor.required) : []
+  const optional = descriptor ? Object.entries(descriptor.optional) : []
+
   return (
-    <div
-      className="absolute top-4 right-4 z-20 w-[260px] max-h-[calc(100%-32px)] bg-white border-2 border-black rounded-panel flex flex-col overflow-hidden shadow-lg"
-      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-    >
-      <div
-        onPointerDown={startDrag}
-        className="flex items-center justify-between px-4 py-3 border-b-2 border-black cursor-grab active:cursor-grabbing shrink-0"
-      >
+    <div data-cat={category}>
+      <div className="insp-head">
+        <span className="cat-tile">
+          <CategoryIcon category={category} />
+        </span>
         {isEditingName ? (
           <input
             autoFocus
             value={nameDraft}
-            onPointerDown={(event) => event.stopPropagation()}
-            onChange={(event) => setNameDraft(event.target.value)}
+            onChange={(e) => setNameDraft(e.target.value)}
             onBlur={submitRename}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') submitRename()
-              if (event.key === 'Escape') {
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitRename()
+              if (e.key === 'Escape') {
                 setNameDraft(node.name)
                 setIsEditingName(false)
               }
             }}
-            className="font-headline font-semibold text-sm bg-transparent outline-none border-b border-brand"
+            className="insp-name-input"
           />
         ) : (
           <h2
-            className="font-headline font-semibold text-sm truncate min-w-0 cursor-text hover:text-brand hover:underline transition-colors"
-            onPointerDown={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => {
-              event.stopPropagation()
+            className="insp-name m-0"
+            title="Double-click to rename"
+            onDoubleClick={() => {
+              setNameDraft(node.name)
               setIsEditingName(true)
             }}
           >
             {node.name}
           </h2>
         )}
-        <button type="button" onClick={onClose} className="text-muted hover:text-ink transition-colors shrink-0">
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 6 18 18M6 18 18 6" />
-          </svg>
-        </button>
+        <Badge tone="personal">{node.type}</Badge>
       </div>
 
-      <div className="p-4 overflow-auto">
-        <div className="font-mono text-[10px] tracking-wide text-muted uppercase mb-3">{node.type}</div>
-
-        {!descriptor ? (
-          <p className="text-[12px] text-muted">Unknown node type.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {Object.entries(descriptor.required).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
-            {Object.entries(descriptor.optional).map(([fieldName, typeName]) => renderField(fieldName, typeName))}
-            {Object.keys(descriptor.required).length === 0 && Object.keys(descriptor.optional).length === 0 && (
-              <p className="text-[12px] text-muted">No params for this node.</p>
-            )}
-          </div>
-        )}
-      </div>
+      {!descriptor ? (
+        <p className="dock-empty">Unknown node type.</p>
+      ) : required.length === 0 && optional.length === 0 ? (
+        <p className="dock-empty">No params for this node.</p>
+      ) : (
+        <div className="insp-grid">
+          {required.map(([f, t]) => renderField(f, t, true))}
+          {optional.map(([f, t]) => renderField(f, t, false))}
+        </div>
+      )}
     </div>
   )
 }

@@ -13,17 +13,10 @@ interface ConfirmDialogProps {
   error?: string | null
 }
 
-/**
- * Reusable confirm dialog.
- * - Closes on Esc key
- * - Auto-focuses the safe "Cancel" button
- * - Clicking backdrop also cancels
- */
 export function ConfirmDialog({
   title,
   description,
   confirmLabel = 'Delete',
-  loadingLabel,
   confirmVariant = 'danger',
   onConfirm,
   onCancel,
@@ -32,66 +25,45 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
 
-  // Auto-focus Cancel (safe action) when dialog mounts
   useEffect(() => {
     cancelRef.current?.focus()
   }, [])
 
-  // Close on Esc
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onCancel()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [onCancel])
 
+  const danger = confirmVariant === 'danger'
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      onClick={onCancel}
-    >
-      {/* Panel — z-10 ensures it stacks above backdrop, stopPropagation prevents closing on panel click */}
-      <div
-        className="relative z-10 w-[420px] max-w-[90vw] bg-white border border-line rounded-panel p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="confirm-dialog-title" className="font-headline font-semibold text-[15px] mb-2">
-          {title}
-        </h2>
-        <p className="text-[13.5px] text-slate leading-relaxed mb-6">{description}</p>
-
-        {error && (
-          <p className="text-xs text-warn mb-4 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-            Error: {error}
-          </p>
-        )}
-
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            ref={cancelRef}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
+    <div className="overlay" role="dialog" aria-modal="true" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className="modal" style={{ width: 'min(430px, 100%)' }}>
+        <div className="dialog-body">
+          <div className={`dialog-icon ${danger ? 'danger' : 'primary'}`}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              {danger ? <path d="M12 8v5m0 3.5v.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /> : <path d="M5 12.5 10 17.5 19 7" />}
+            </svg>
+          </div>
+          <div>
+            <h2 className="m-0 mb-1 text-[16px] font-bold">{title}</h2>
+            <p>{description}</p>
+          </div>
+        </div>
+        {error && <p className="err mb-3">Error: {error}</p>}
+        <div className="modal-actions">
+          <Button ref={cancelRef} type="button" variant="outline" size="sm" onClick={onCancel} disabled={isLoading}>
             Cancel
           </Button>
           <Button
             type="button"
             size="sm"
             onClick={onConfirm}
-            disabled={isLoading}
-            variant={confirmVariant === 'primary' ? 'primary' : 'outline'}
-            className={confirmVariant === 'danger' ? 'bg-warn text-white border-transparent hover:bg-warn/90' : undefined}
+            loading={isLoading}
+            variant={danger ? 'solid-danger' : 'primary'}
           >
-            {isLoading ? (loadingLabel ?? (confirmLabel ? `${confirmLabel}…` : 'Deleting…')) : confirmLabel}
+            {confirmLabel}
           </Button>
         </div>
       </div>

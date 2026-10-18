@@ -1,12 +1,16 @@
 import { forwardRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card } from '@/shared/components/ui/Card'
+import { cn } from '@/shared/lib/cn'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Avatar } from '@/shared/components/ui/Avatar'
 import { Input } from '@/shared/components/ui/Input'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
+import { IconButton } from '@/shared/components/ui/IconButton'
+import { ArrowRightIcon, MoreIcon } from '@/shared/components/ui/icons'
 import { Workspace } from '../types'
 import { workspaceColorFor } from '../lib/color'
+import { openWithTransition } from '../lib/open-transition'
+import { PipelineThumb } from './PipelineThumb'
 
 interface WorkspaceCardProps {
   workspace: Workspace
@@ -19,11 +23,7 @@ interface WorkspaceCardProps {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(function WorkspaceCard(
@@ -31,7 +31,6 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
   ref,
 ) {
   const navigate = useNavigate()
-  const accentColor = workspaceColorFor(workspace.id)
   const [isEditing, setIsEditing] = useState(false)
   const [nameDraft, setNameDraft] = useState(workspace.name)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -43,72 +42,74 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
     else setNameDraft(workspace.name)
   }
 
+  function open(card: HTMLElement) {
+    openWithTransition(card, () => navigate(`/workspaces/${workspace.id}`))
+  }
+
   return (
-    <Card
+    <div
       ref={ref}
-      highlighted={isHighlighted}
-      className="cursor-pointer border-2 !border-black"
-      onClick={() => navigate(`/workspaces/${workspace.id}`)}
+      role="link"
+      tabIndex={0}
+      className={cn('wsc', isHighlighted && 'flash', isDeleting && 'deleting')}
+      style={{ ['--accent' as string]: workspaceColorFor(workspace.id) }}
+      onClick={(event) => !isEditing && open(event.currentTarget)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && !isEditing && event.target === event.currentTarget) open(event.currentTarget)
+      }}
       onContextMenu={(event) => {
         event.preventDefault()
         setContextMenu({ x: event.clientX, y: event.clientY })
       }}
     >
-      <div className="flex items-start justify-between mb-3.5">
-        <div
-          className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center"
-          style={{ background: `color-mix(in srgb, ${accentColor} 16%, white)` }}
-        >
-          <svg className="w-4 h-4" style={{ color: accentColor }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <path d="M4 10h16M10 10v10" />
-          </svg>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
-          <button
-            type="button"
-            aria-label="Workspace actions"
+      <div className="wsc-thumb">
+        <PipelineThumb spec={workspace.spec} fallback={workspace.id} />
+        <div className={cn('wsc-menu', contextMenu && 'open')}>
+          <IconButton
+            size="sm"
+            tip="Actions"
             onClick={(event) => {
               event.stopPropagation()
               const rect = event.currentTarget.getBoundingClientRect()
-              setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+              setContextMenu({ x: rect.left, y: rect.bottom + 6 })
             }}
-            className="w-6 h-6 flex items-center justify-center rounded text-muted hover:text-ink hover:bg-cream-soft transition-colors"
           >
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-              <circle cx="5" cy="12" r="1.5" />
-              <circle cx="12" cy="12" r="1.5" />
-              <circle cx="19" cy="12" r="1.5" />
-            </svg>
-          </button>
+            <MoreIcon className="w-4 h-4" />
+          </IconButton>
         </div>
       </div>
 
-      {isEditing ? (
-        <Input
-          autoFocus
-          maxLength={200}
-          value={nameDraft}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => setNameDraft(event.target.value)}
-          onBlur={submitRename}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') submitRename()
-            if (event.key === 'Escape') {
-              setNameDraft(workspace.name)
-              setIsEditing(false)
-            }
-          }}
-          className="mb-1"
-        />
-      ) : (
-        <h3 className="text-[15px] font-semibold truncate min-w-0 mb-1">{workspace.name}</h3>
-      )}
-      <div className="font-mono text-xs text-muted mb-4">created {formatDate(workspace.created_at)}</div>
+      <div className="wsc-body">
+        {isEditing ? (
+          <Input
+            autoFocus
+            maxLength={200}
+            value={nameDraft}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={submitRename}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') submitRename()
+              if (event.key === 'Escape') {
+                setNameDraft(workspace.name)
+                setIsEditing(false)
+              }
+            }}
+          />
+        ) : (
+          <h3 title={workspace.name}>{workspace.name}</h3>
+        )}
+        <span className="date">created {formatDate(workspace.created_at)}</span>
+      </div>
 
-      <div className="flex items-center border-t border-line pt-3">
-        <Avatar name={ownerName} size={20} />
+      <div className="wsc-foot">
+        <div className="who">
+          <Avatar name={ownerName} size={22} />
+          <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
+        </div>
+        <span className="open">
+          Open <ArrowRightIcon />
+        </span>
       </div>
 
       {contextMenu && (
@@ -128,6 +129,6 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
           ]}
         />
       )}
-    </Card>
+    </div>
   )
 })
