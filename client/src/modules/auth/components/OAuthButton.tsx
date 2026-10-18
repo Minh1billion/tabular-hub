@@ -3,14 +3,8 @@ import { oauthLoginUrl } from '@/shared/lib/api-client'
 import { OAuthProvider } from '../types'
 
 const providerConfig: Record<OAuthProvider, { label: string; className: string }> = {
-  google: {
-    label: 'Continue with Google',
-    className: 'bg-white border border-line text-ink hover:border-[#c7ccc4] hover:bg-cream-soft',
-  },
-  github: {
-    label: 'Continue with GitHub',
-    className: 'bg-brand-deep border border-brand-deep text-[#eff3ec] hover:bg-[#0e3325]',
-  },
+  google: { label: 'Continue with Google', className: '' },
+  github: { label: 'Continue with GitHub', className: 'dark' },
 }
 
 function GoogleIcon() {
@@ -58,15 +52,9 @@ export function OAuthButton({ provider }: OAuthButtonProps) {
   const Icon = icons[provider]
 
   return (
-    <a
-      href={oauthLoginUrl(provider)}
-      className={cn(
-        'w-full flex items-center gap-3 px-4 py-[13px] rounded-[10px] font-medium text-sm cursor-pointer transition-all active:scale-[0.98]',
-        className,
-      )}
-    >
+    <a href={oauthLoginUrl(provider)} className={cn('oauth', className)}>
       <Icon />
-      <span className="flex-1 text-left">{label}</span>
+      <span>{label}</span>
     </a>
   )
 }

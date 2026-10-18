@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCurrentUser } from '@/modules/auth/hooks'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
+import { PageHead } from '@/shared/components/ui/PageHead'
 import { useCreateWorkspace, useDeleteWorkspace, useRenameWorkspace, useWorkspaces } from '../hooks'
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
 import { Workspace } from '../types'
@@ -18,6 +19,7 @@ export function WorkspaceListPage() {
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounce(query, 150)
@@ -61,7 +63,7 @@ export function WorkspaceListPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="wl">
       <WorkspaceListPanel
         workspaces={filteredWorkspaces}
         activeId={activeId}
@@ -71,64 +73,71 @@ export function WorkspaceListPage() {
         onQueryChange={setQuery}
       />
 
-      <main className="relative flex-1 overflow-auto px-10 py-8">
-        <GridPattern cellSize={28} />
+      <main className="wl-main thin-scrollbar">
+        <GridPattern cellSize={28} className="pg-grid" />
 
-        <div className="relative flex items-end justify-between mb-6">
-          <div>
-            <h2 className="font-headline font-semibold text-[22px] mb-1.5">Your workspaces</h2>
-            <p className="text-[13.5px] text-slate">Manage your workspaces and the tables inside them.</p>
-          </div>
-        </div>
+        <div className="wl-inner">
+          <PageHead kicker="Workspaces" title="Your workspaces" subtitle="Manage your workspaces and the tables inside them." />
 
-        {isLoading ? (
-          <p className="relative text-sm text-muted">Loading workspaces…</p>
-        ) : (
-          <div className="relative grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3.5">
-            {filteredWorkspaces.map((workspace) => (
-              <WorkspaceCard
-                key={workspace.id}
-                ref={(el) => {
-                  cardRefs.current[workspace.id] = el
-                }}
-                workspace={workspace}
-                ownerName={ownerName}
-                isPersonal={workspace.owner_id === user?.id && workspaces.length === 1}
-                onDelete={(id) => {
-                  const target = workspaces.find((item) => item.id === id)
-                  if (target) setDeletingWorkspace(target)
-                }}
-                onRename={(id, name) => renameWorkspace.mutate({ id, name })}
-                isDeleting={deleteWorkspace.isPending && deleteWorkspace.variables === workspace.id}
-                isHighlighted={highlightedId === workspace.id}
-              />
-            ))}
+          {isLoading ? (
+            <div className="wl-grid">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="wsc-skel skeleton" />
+              ))}
+            </div>
+          ) : (
+            <div className="wl-grid stagger">
+              {filteredWorkspaces.map((workspace) => (
+                <WorkspaceCard
+                  key={workspace.id}
+                  ref={(el) => {
+                    cardRefs.current[workspace.id] = el
+                  }}
+                  workspace={workspace}
+                  ownerName={ownerName}
+                  isPersonal={workspace.owner_id === user?.id && workspaces.length === 1}
+                  onDelete={(id) => {
+                    const target = workspaces.find((item) => item.id === id)
+                    if (target) setDeletingWorkspace(target)
+                  }}
+                  onRename={(id, name) => renameWorkspace.mutate({ id, name })}
+                  isDeleting={deleteWorkspace.isPending && deleteWorkspace.variables === workspace.id}
+                  isHighlighted={highlightedId === workspace.id}
+                />
+              ))}
 
-            {debouncedQuery && filteredWorkspaces.length === 0 && (
-              <p className="text-sm text-muted col-span-full">No workspaces match “{debouncedQuery}”.</p>
-            )}
+              {debouncedQuery && filteredWorkspaces.length === 0 && <p className="wl-none">No workspaces match “{debouncedQuery}”.</p>}
 
-            {!debouncedQuery && (
-              <CreateWorkspaceCard
-                isOpen={isCreating}
-                onOpen={() => setIsCreating(true)}
-                onCancel={() => setIsCreating(false)}
-                onSubmit={(name) =>
-                  createWorkspace.mutate(
-                    { name },
-                    {
-                      onSuccess: (workspace) => {
-                        setActiveId(workspace.id)
-                        setIsCreating(false)
+              {!debouncedQuery && (
+                <CreateWorkspaceCard
+                  isOpen={isCreating}
+                  onOpen={() => setIsCreating(true)}
+                  onCancel={() => {
+                    setIsCreating(false)
+                    setCreateError(null)
+                  }}
+                  onSubmit={(name) => {
+                    setCreateError(null)
+                    createWorkspace.mutate(
+                      { name },
+                      {
+                        onSuccess: (workspace) => {
+                          setActiveId(workspace.id)
+                          setIsCreating(false)
+                        },
+                        onError: (err: unknown) => {
+                          setCreateError(err instanceof Error ? err.message : 'Could not create the workspace. Please try again.')
+                        },
                       },
-                    },
-                  )
-                }
-                isSubmitting={createWorkspace.isPending}
-              />
-            )}
-          </div>
-        )}
+                    )
+                  }}
+                  isSubmitting={createWorkspace.isPending}
+                  error={createError}
+                />
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
       {deletingWorkspace && (

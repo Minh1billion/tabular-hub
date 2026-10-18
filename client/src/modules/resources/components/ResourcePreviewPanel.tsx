@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Button } from '@/shared/components/ui/Button'
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog'
+import { TableIcon } from '@/shared/components/ui/icons'
 import { useDeleteResource, useResourcePreview } from '../hooks'
+import { DataTable } from './DataTable'
 
 const PAGE_SIZE = 50
 
@@ -20,108 +22,68 @@ export function ResourcePreviewPanel({ workspaceId, activeKey, onDeleted }: Reso
 
   if (!activeKey) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted">
-        Select a dataset to preview it.
+      <div className="flex-1 grid place-items-center p-6">
+        <div className="rs-empty">
+          <span className="cat-tile" data-cat="IO">
+            <TableIcon className="w-5 h-5" />
+          </span>
+          <strong>No dataset selected</strong>
+          <p>Select a dataset to preview it.</p>
+        </div>
       </div>
     )
   }
 
-  const columns = preview?.rows[0] ? Object.keys(preview.rows[0]) : []
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 flex items-center gap-3 px-5 border-b border-line bg-white shrink-0">
-        <span className="font-mono text-sm text-ink truncate">{activeKey}</span>
-        {preview && (
-          <span className="font-mono text-[11px] text-muted">
-            {preview.returned_rows} / {preview.row_count} rows
-          </span>
-        )}
+      <div className="flex items-center gap-3 shrink-0 h-12 px-5 bg-white" style={{ borderBottom: 'var(--edge-soft)' }}>
+        <span className="font-mono text-[13px] font-semibold truncate">{activeKey}</span>
+        {preview && <span className="ri-meta">{preview.returned_rows} / {preview.row_count} rows</span>}
         <div className="flex-1" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsConfirmingDelete(true)}
-          disabled={deleteResource.isPending}
-        >
-          {deleteResource.isPending ? 'Deleting…' : 'Delete'}
+        <Button type="button" variant="danger" size="sm" onClick={() => setIsConfirmingDelete(true)} loading={deleteResource.isPending}>
+          Delete
         </Button>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        {isLoading && <p className="text-sm text-muted p-5">Loading preview…</p>}
-
-        {!isLoading && preview && (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="sticky top-0 bg-cream-soft">
-                {columns.map((column) => (
-                  <th key={column} className="font-mono text-[10px] uppercase text-muted px-3 py-2 border-b border-line">
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {preview.rows.map((row, index) => (
-                <tr key={index} className="hover:bg-cream-soft">
-                  {columns.map((column) => (
-                    <td key={column} className="text-[13px] text-slate px-3 py-2 border-b border-line whitespace-nowrap">
-                      {String(row[column])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="flex-1 overflow-auto thin-scrollbar">
+        {isLoading && (
+          <div className="ri-skel">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="skeleton" />
+            ))}
+          </div>
         )}
-
-        {!isLoading && preview && preview.rows.length === 0 && (
-          <p className="text-sm text-muted p-5">This dataset has no rows.</p>
-        )}
+        {!isLoading && preview && preview.rows.length > 0 && <DataTable rows={preview.rows} offset={offset} />}
+        {!isLoading && preview && preview.rows.length === 0 && <p className="ri-state">This dataset has no rows.</p>}
       </div>
 
       {preview && preview.row_count > PAGE_SIZE && (
-        <div className="h-12 flex items-center justify-center gap-3 border-t border-line bg-white shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            disabled={offset === 0}
-          >
+        <div className="ri-foot">
+          <Button type="button" variant="outline" size="sm" onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0}>
             Previous
           </Button>
-          <span className="text-xs text-muted font-mono">
+          <span className="page-jump">
             {offset + 1}–{Math.min(offset + PAGE_SIZE, preview.row_count)} of {preview.row_count}
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= preview.row_count}
-          >
+          <Button type="button" variant="outline" size="sm" onClick={() => setOffset(offset + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= preview.row_count}>
             Next
           </Button>
         </div>
       )}
 
-      {/* Confirm delete resource */}
       {isConfirmingDelete && (
         <ConfirmDialog
           title={`Delete dataset "${activeKey}"?`}
           description={`The dataset "${activeKey}" will be permanently removed from this workspace. Any pipeline nodes referencing it will be affected. This action cannot be undone.`}
           confirmLabel="Delete dataset"
-          onConfirm={() => {
-            deleteResource.mutate(activeKey!, {
+          onConfirm={() =>
+            deleteResource.mutate(activeKey, {
               onSuccess: () => {
                 setIsConfirmingDelete(false)
                 onDeleted()
               },
             })
-          }}
+          }
           onCancel={() => setIsConfirmingDelete(false)}
           isLoading={deleteResource.isPending}
         />

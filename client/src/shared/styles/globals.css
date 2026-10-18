@@ -1,78 +1,64 @@
 @import './tokens.css';
 @import '@xyflow/react/dist/style.css';
+@import './components.css';
+@import './motion.css';
+@import '../../app/layouts/styles.css';
+@import '../../modules/editor/editor.css';
+@import '../../modules/resources/resources.css';
+@import '../../modules/workspace/workspace.css';
+@import '../../modules/billing/billing.css';
+@import '../../modules/runs/runs.css';
+@import '../../app/pages/home.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
-}
-
-/* Thin, unobtrusive scrollbar for icon rails so it doesn't crowd narrow collapsed panels. */
-.thin-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-.thin-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.thin-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.thin-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--line);
-  border-radius: 999px;
-}
-
-@keyframes node-settle {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .animate-node-settle {
-    animation: node-settle 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
 
 body {
   margin: 0;
   background: var(--cream);
   color: var(--ink);
-  font-family: 'IBM Plex Sans', sans-serif;
+  font: 14px/1.55 var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
-.font-headline {
-  font-family: 'IBM Plex Sans', sans-serif;
-}
+h1, h2, h3 { font-family: var(--font-body); }
+.font-headline { font-family: var(--font-body); }
+.font-mono { font-family: var(--font-mono); }
 
-.font-mono {
-  font-family: 'JetBrains Mono', monospace;
-}
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+::selection { background: var(--brand); color: var(--ink); }
+
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: var(--line-2); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+.thin-scrollbar { scrollbar-width: thin; }
 
 .react-flow {
   --xy-background-color: var(--cream);
-  --xy-background-pattern-color: var(--line);
-  --xy-edge-stroke: var(--line);
+  --xy-background-pattern-color: var(--line-2);
+  --xy-edge-stroke: var(--ink);
   --xy-edge-stroke-selected: var(--brand);
-  --xy-edge-stroke-width: 1.5;
+  --xy-edge-stroke-width: 2;
   --xy-connectionline-stroke: var(--brand);
-  --xy-connectionline-stroke-width: 1.5;
+  --xy-connectionline-stroke-width: 2;
   --xy-handle-background-color: var(--white);
-  --xy-handle-border-color: var(--muted);
+  --xy-handle-border-color: var(--ink);
   --xy-minimap-background-color: var(--white);
-  --xy-minimap-mask-background-color: rgba(22, 35, 28, 0.06);
-  --xy-minimap-node-background-color: var(--cream-soft);
+  --xy-minimap-mask-background-color: rgba(22, 35, 28, 0.08);
+  --xy-minimap-node-background-color: var(--brand-tint-2);
   --xy-controls-button-background-color: var(--white);
-  --xy-controls-button-background-color-hover: var(--cream-soft);
-  --xy-controls-button-border-color: var(--line);
-  --xy-controls-button-color: var(--slate);
+  --xy-controls-button-background-color-hover: var(--brand-tint);
+  --xy-controls-button-border-color: var(--ink);
+  --xy-controls-button-color: var(--ink);
   --xy-controls-button-color-hover: var(--ink);
 }
+.react-flow__controls { border: var(--edge); border-radius: var(--r-s); box-shadow: var(--shadow-1); overflow: hidden; }
+.react-flow__controls-button { border-bottom: 1px solid var(--line-2); }
+.react-flow__minimap { border: var(--edge); border-radius: var(--r-s); box-shadow: var(--shadow-1); overflow: hidden; }
+.react-flow__attribution { display: none; }

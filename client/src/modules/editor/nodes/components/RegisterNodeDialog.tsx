@@ -25,20 +25,20 @@ export function RegisterNodeDialog({ workspaceId, onClose }: RegisterNodeDialogP
 
   return (
     <Modal title="New custom node" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">Name</label>
+      <form onSubmit={handleSubmit}>
+        <div className="field">
+          <label className="field-label">Name</label>
           <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. clip_positive" />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">Expression</label>
-          <div className="rounded-lg border border-line bg-[#f4f6f2] overflow-hidden">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-line bg-cream-soft">
-              <span className="w-2 h-2 rounded-full bg-[#e5b8b8]" />
-              <span className="w-2 h-2 rounded-full bg-[#e8d8a8]" />
-              <span className="w-2 h-2 rounded-full bg-[#b8dcc0]" />
-              <span className="ml-2 font-mono text-[10px] text-muted">polars expression</span>
+        <div className="field">
+          <label className="field-label">Expression</label>
+          <div style={{ border: "var(--edge)", borderRadius: "var(--r-s)", overflow: "hidden", background: "var(--cream)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderBottom: "var(--edge)", background: "var(--cream-soft)" }}>
+              <span className="w-2 h-2 rounded-full bg-warn" />
+              <span className="w-2 h-2 rounded-full bg-accent-gold" />
+              <span className="w-2 h-2 rounded-full bg-brand" />
+              <span className="ml-2 font-mono text-[10px] text-slate">polars expression</span>
             </div>
             <textarea
               value={expression}
@@ -49,27 +49,28 @@ export function RegisterNodeDialog({ workspaceId, onClose }: RegisterNodeDialogP
               className="w-full px-3 py-2.5 font-mono text-[13px] text-ink bg-transparent outline-none resize-none placeholder:text-muted"
             />
           </div>
-          <p className="text-[11px] text-muted">Available names: value, pl.</p>
+          <p className="hint m-0">Available names: value, pl.</p>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">Description</label>
+        <div className="field">
+          <label className="field-label">Description</label>
           <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional" />
         </div>
 
-        {registerNode.isError && <p className="text-[12px] text-warn">{registerNode.error.message}</p>}
+        {registerNode.isError && <p className="err m-0">{registerNode.error.message}</p>}
 
-        <div className="flex items-center gap-2 justify-end pt-1">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={registerNode.isPending}>
+        <div className="modal-actions">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={registerNode.isPending}>
             Cancel
           </Button>
           <Button
             type="submit"
             variant="primary"
             size="sm"
-            disabled={registerNode.isPending || !name.trim() || !expression.trim()}
+            loading={registerNode.isPending}
+            disabled={!name.trim() || !expression.trim()}
           >
-            {registerNode.isPending ? 'Saving…' : 'Register'}
+            Register
           </Button>
         </div>
       </form>
