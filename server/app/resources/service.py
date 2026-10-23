@@ -16,9 +16,32 @@ from app.run import service as run_service
 from app.run.models import Run
 from app.workspace.models import Workspace
 
+def _get_limit_by_workspace(db: Session, workspace: Workspace) -> int:
+    return billing_service.get_plan_limits(db, workspace.owner_id)["max_total_storage_bytes"]
+
 def presign_upload(
-    db: Session, *, workspace: Workspace, key: str, filename: str, format: str, overwrite: bool, idempotency_key: str
-) -> tuple[Run, str, str]:
+    db: Session,
+    *,
+    workspace: Workspace,
+    key: str,
+    filename: str,
+    format: str,
+    overwrite: bool,
+    idempotency_key: str,
+    content_length: int,
+) -> tuple[Run, dict]:
+    limits = _get_limit_by_workspace(db, workspace)
+    if content_length > limits["max_resource_size_bytes"]:
+        raise PayloadTooLargeError(f"File exceeds plan limit of {limits['max_resource_size_bytes']} bytes")
+
+    current_usage = (
+        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
+        .filter(ResourceUsage.workspace_id == workspace.id)
+        .scalar()
+    )
+    if current_usage + content_length > limits["max_total_storage_bytes"]:
+        raise PayloadTooLargeError(f"Workspace storage limit of {limits['max_total_storage_bytes']} bytes exceeded")
+
     staging_key = staging.new_key(str(workspace.id), filename)
     run = run_service.create_run(
         db,
@@ -28,8 +51,8 @@ def presign_upload(
         kind="import",
         status="pending_upload",
     )
-    upload_url = staging.presign_put(staging_key)
-    return run, upload_url, staging_key
+    post = staging.presign_post(staging_key, limits["max_resource_size_bytes"])
+    return run, post, staging_key
 
 def confirm_upload(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> Run:
     run = run_service.get_run(db, workspace_id=workspace.id, run_id=run_id)
@@ -38,7 +61,7 @@ def confirm_upload(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> R
     if not staging.exists(run.spec["staging_key"]):
         raise HTTPException(status_code=400, detail="Upload not found in staging")
 
-    limits = billing_service.get_plan_limits(db, workspace.owner_id)
+    limits = _get_limit_by_workspace(db, workspace)
     upload_size = staging.size(run.spec["staging_key"])
     if upload_size > limits["max_resource_size_bytes"]:
         staging.delete(run.spec["staging_key"])

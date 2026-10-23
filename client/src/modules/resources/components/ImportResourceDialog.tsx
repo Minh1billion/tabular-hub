@@ -10,9 +10,17 @@ import { Segmented } from '@/shared/components/ui/Segmented'
 import { cn } from '@/shared/lib/cn'
 import { useRunTracking } from '@/modules/runs/hooks-tracking'
 import { useRunEventHistory } from '@/modules/runs/hooks-event-history'
+import { useSubscription } from '@/modules/billing/hooks'
 import { useImportResource } from '../hooks'
 
 const FORMATS = ['csv', 'parquet', 'arrow', 'json'].map((value) => ({ value, label: value }))
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
 
 interface ImportResourceDialogProps {
   workspaceId: string
@@ -29,6 +37,16 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
 
   const importResource = useImportResource(workspaceId)
   const { data: run } = useRunTracking(workspaceId, importResource.data?.id)
+  const { data: subscription } = useSubscription()
+
+  const sizeError =
+    file && subscription
+      ? file.size > subscription.max_resource_size_bytes
+        ? `File is ${formatBytes(file.size)}, plan limit is ${formatBytes(subscription.max_resource_size_bytes)}`
+        : file.size > subscription.max_total_storage_bytes - subscription.storage_used_bytes
+          ? `File exceeds remaining storage (${formatBytes(subscription.max_total_storage_bytes - subscription.storage_used_bytes)} left)`
+          : undefined
+      : undefined
 
   const failed = run?.status === 'failed'
   const completed = run?.status === 'completed'
@@ -62,7 +80,7 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!file) return
+    if (!file || sizeError) return
     importResource.mutate({ key: key.trim(), format, overwrite, file })
   }
 
@@ -73,6 +91,7 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
       <form onSubmit={handleSubmit}>
         <Field label="File">
           <FileDrop file={file} onChange={handleFile} disabled={locked} />
+          {sizeError && <p className="text-[12px] text-warn">{sizeError}</p>}
         </Field>
 
         <Field label="Key" hint="Pipelines reference the dataset by this name.">
@@ -131,7 +150,12 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
               Done
             </Button>
           ) : (
-            <Button type="submit" size="sm" loading={importResource.isPending} disabled={locked || !file || !key.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              loading={importResource.isPending}
+              disabled={locked || !file || !key.trim() || Boolean(sizeError)}
+            >
               {importResource.isPending ? 'Uploading…' : 'Import'}
             </Button>
           )}
