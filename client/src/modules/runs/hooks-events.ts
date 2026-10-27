@@ -45,6 +45,10 @@ export function useRunEvents(workspaceId: string | undefined, runId: string | un
           )
           queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'runs'] })
           source.close()
+        } else {
+          queryClient.setQueryData<Run>(['workspaces', workspaceId, 'runs', runId], (prev) =>
+            prev && prev.status === 'queued' ? { ...prev, status: 'running' } : prev,
+          )
         }
       }
 

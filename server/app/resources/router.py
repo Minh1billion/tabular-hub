@@ -1,10 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from tabular_manner.engine.bootstrap import Engine
 
+from app.core import staging
 from app.core.engine import get_engine
 from app.database import get_db
 from app.dependencies import get_owned_workspace
@@ -89,3 +91,28 @@ def download_export(
     db: Session = Depends(get_db),
 ):
     return ExportDownloadResponse(download_url=service.get_export_download_url(db, workspace=workspace, run_id=run_id))
+
+
+staging_router = APIRouter(prefix="/staging", tags=["staging"])
+
+
+@staging_router.put("/{staging_key:path}")
+async def upload_staging_file(staging_key: str, request: Request):
+    if not staging.is_local():
+        raise HTTPException(status_code=404, detail="Local staging disabled")
+    dest = staging.local_path(staging_key)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("wb") as f:
+        async for chunk in request.stream():
+            f.write(chunk)
+    return Response(status_code=status.HTTP_200_OK)
+
+
+@staging_router.get("/{staging_key:path}")
+def download_staging_file(staging_key: str, filename: str | None = Query(None)):
+    if not staging.is_local():
+        raise HTTPException(status_code=404, detail="Local staging disabled")
+    target = staging.local_path(staging_key)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Staging file not found")
+    return FileResponse(path=target, filename=filename or target.name, media_type="application/octet-stream")

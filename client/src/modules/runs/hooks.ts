@@ -36,7 +36,7 @@ export function useRuns(
     placeholderData: (previous) => previous,
     refetchInterval: (query) => {
       const data = query.state.data as Run[] | undefined
-      const hasActive = data?.some((r) => ['queued', 'running', 'cancelling'].includes(r.status))
+      const hasActive = data?.some((r) => ['queued', 'running', 'cancelling', 'pending_upload'].includes(r.status))
       return hasActive ? 2000 : 5000
     },
   })
@@ -50,7 +50,7 @@ export function useRun(workspaceId: string, runId: string | undefined) {
     retry: false,
     refetchInterval: (query) => {
       const run = query.state.data as Run | undefined
-      const isRunning = run && ['queued', 'running', 'cancelling'].includes(run.status)
+      const isRunning = run && ['queued', 'running', 'cancelling', 'pending_upload'].includes(run.status)
       return isRunning ? 2000 : false
     },
   })
