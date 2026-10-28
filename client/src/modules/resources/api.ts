@@ -23,18 +23,30 @@ export function deleteResource(workspaceId: string, key: string) {
   return apiClient.delete<void>(`/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}`)
 }
 
-function putToStaging(uploadUrl: string, file: File, onProgress?: (percent: number) => void) {
+function postToStaging(
+  uploadUrl: string,
+  fields: Record<string, string>,
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
   return new Promise<void>((resolve, reject) => {
+    const formData = new FormData()
+    Object.entries(fields).forEach(([field, value]) => formData.append(field, value))
+    formData.append('file', file)
+
     const xhr = new XMLHttpRequest()
-    xhr.open('PUT', uploadUrl)
+    xhr.open('POST', uploadUrl)
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
         onProgress(Math.round((event.loaded / event.total) * 100))
       }
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed')))
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(xhr.status === 413 ? 'File exceeds allowed size' : 'Upload failed'))
     xhr.onerror = () => reject(new Error('Network error'))
-    xhr.send(file)
+    xhr.send(formData)
   })
 }
 
@@ -49,9 +61,10 @@ export async function importResource(
     format: payload.format,
     overwrite: payload.overwrite,
     idempotency_key: crypto.randomUUID(),
+    content_length: payload.file.size,
   })
 
-  await putToStaging(presign.upload_url, payload.file, onProgress)
+  await postToStaging(presign.upload_url, presign.upload_fields, payload.file, onProgress)
 
   return apiClient.post<Run>(`/workspaces/${workspaceId}/resources/${presign.run_id}/confirm-upload`)
 }

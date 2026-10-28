@@ -25,6 +25,7 @@ export interface ExportResourcePayload {
 export interface PresignUploadResponse {
   run_id: string
   upload_url: string
+  upload_fields: Record<string, string>
   staging_key: string
 }
 

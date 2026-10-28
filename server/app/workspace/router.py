@@ -2,8 +2,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from tabular_manner.engine.bootstrap import Engine
 
 from app.auth.models import User
+from app.core.engine import get_engine
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.core.engine import get_engine

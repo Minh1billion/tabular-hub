@@ -1,3 +1,4 @@
+import { AlertIcon, ArrowRightIcon } from '@/shared/components/ui/icons'
 import { RunStreamEvent } from '../types'
 
 interface RunEventTimelineProps {
@@ -31,23 +32,31 @@ function computeNodeProgress(events: RunStreamEvent[]): Record<string, NodeProgr
   return state
 }
 
+function kindOf(name: string) {
+  if (name === 'failed' || name === 'cancelled' || name === 'node_failed') return 'bad'
+  if (name === 'completed' || name === 'node_completed') return 'ok'
+  if (name.endsWith('started') || name === 'queued' || name === 'running') return 'run'
+  return 'n'
+}
+
 function NodeProgressBar({ nodeId, progress }: { nodeId: string; progress: NodeProgressState }) {
-  const percent =
-    progress.processed != null && progress.total ? Math.min(100, Math.round((progress.processed / progress.total) * 100)) : null
+  const percent = progress.processed != null && progress.total ? Math.min(100, Math.round((progress.processed / progress.total) * 100)) : null
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between font-mono text-[11px] text-ink">
+    <div className="tl-prog">
+      <div className="tl-prog-top">
         <span>{nodeId}</span>
-        {percent != null && <span className="text-muted">{percent}%</span>}
+        {percent != null && <span>{percent}%</span>}
       </div>
-      <div className="h-1.5 w-full rounded-full bg-cream-soft overflow-hidden">
-        {percent != null ? (
-          <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${percent}%` }} />
-        ) : (
-          <div className="h-full w-1/3 rounded-full bg-brand animate-pulse" />
-        )}
-      </div>
+      {percent != null ? (
+        <div className="bar live">
+          <i style={{ width: `${percent}%` }} />
+        </div>
+      ) : (
+        <div className="bar indet">
+          <i />
+        </div>
+      )}
     </div>
   )
 }
@@ -59,15 +68,16 @@ export function RunEventTimeline({ events }: RunEventTimelineProps) {
 
   const nodeProgress = computeNodeProgress(events)
   const activeNodes = Object.entries(nodeProgress).filter(([, progress]) => progress.status === 'running')
+  const visibleEvents = events.filter((event) => event.event !== 'node_progress')
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="tl-wrap">
       {failedEvent && (
-        <div className="text-[12px] text-warn">
+        <div className="tl-fail">
+          <AlertIcon />
           {failedEvent.node_id ? (
             <span>
-              Node <b>{failedEvent.node_id as string}</b> ({failedEvent.node_type as string}) failed:{' '}
-              {failedEvent.error as string}
+              Node <code>{failedEvent.node_id as string}</code> ({failedEvent.node_type as string}) failed: {failedEvent.error as string}
             </span>
           ) : (
             <span>{failedEvent.error as string}</span>
@@ -76,7 +86,8 @@ export function RunEventTimeline({ events }: RunEventTimelineProps) {
       )}
 
       {activeNodes.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="tl-sec">
+          <span className="kicker">In progress</span>
           {activeNodes.map(([nodeId, progress]) => (
             <NodeProgressBar key={nodeId} nodeId={nodeId} progress={progress} />
           ))}
@@ -84,27 +95,49 @@ export function RunEventTimeline({ events }: RunEventTimelineProps) {
       )}
 
       {leaves.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="tl-sec">
+          <span className="kicker">Output</span>
           {leaves.map((leaf) => (
-            <div key={leaf.node_id} className="border border-line rounded-lg p-2">
-              <div className="font-mono text-[11px] text-ink">{leaf.node_id}</div>
-              <div className="text-[11px] text-muted">columns: {leaf.columns.join(', ')}</div>
-              <div className="text-[11px] text-muted">history: {leaf.history.join(' → ')}</div>
+            <div key={leaf.node_id} className="tl-leaf">
+              <b>{leaf.node_id}</b>
+              <div className="row">
+                <span>Columns</span>
+                <div className="tl-chips">
+                  {leaf.columns.map((column) => (
+                    <em key={column}>{column}</em>
+                  ))}
+                </div>
+              </div>
+              <div className="row">
+                <span>History</span>
+                <div className="tl-chips">
+                  {leaf.history.map((step, index) => (
+                    <span key={`${step}-${index}`} className="tl-chips">
+                      {index > 0 && <ArrowRightIcon />}
+                      <span className="hop">{step}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      <div className="flex flex-col gap-1 font-mono text-[11px] text-muted">
-        {events
-          .filter((event) => event.event !== 'node_progress')
-          .map((event, index) => (
-            <div key={index}>
-              {event.event}
-              {typeof event.node_id === 'string' ? ` - ${event.node_id}` : ''}
-            </div>
-          ))}
-        {events.length === 0 && <span>No events yet.</span>}
+      <div className="tl-sec">
+        <span className="kicker">Events</span>
+        {visibleEvents.length === 0 ? (
+          <span className="tl-none">No events yet.</span>
+        ) : (
+          <ul className="tl">
+            {visibleEvents.map((event, index) => (
+              <li key={index} data-k={kindOf(event.event)}>
+                <b>{event.event}</b>
+                {typeof event.node_id === 'string' && <span className="node">{event.node_id}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )
