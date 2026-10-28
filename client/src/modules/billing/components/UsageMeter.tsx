@@ -1,5 +1,7 @@
-import { cn } from '@/shared/lib/cn'
 import { Badge } from '@/shared/components/ui/Badge'
+import { cn } from '@/shared/lib/cn'
+
+const SEGMENTS = 20
 
 interface UsageMeterProps {
   label: string
@@ -11,23 +13,21 @@ interface UsageMeterProps {
 export function UsageMeter({ label, used, max, formatValue }: UsageMeterProps) {
   const percent = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0
   const isNearLimit = percent >= 80
+  const filled = used > 0 ? Math.max(1, Math.round((percent / 100) * SEGMENTS)) : 0
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5 text-[13px]">
-        <span className="text-slate font-medium">{label}</span>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-muted">
-            {formatValue(used)} / {formatValue(max)}
-          </span>
+      <div className="um-top">
+        <span>{label}</span>
+        <span className="vals">
+          <b>{formatValue(used)}</b> / {formatValue(max)}
           {isNearLimit && <Badge tone="error">near limit</Badge>}
-        </div>
+        </span>
       </div>
-      <div className="h-2.5 rounded-full bg-cream-soft border border-black overflow-hidden">
-        <div
-          className={cn('h-full rounded-full transition-all', isNearLimit ? 'bg-warn' : 'bg-brand')}
-          style={{ width: `${percent}%` }}
-        />
+      <div className={cn('um-meter', isNearLimit && 'low')} role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+        {Array.from({ length: SEGMENTS }).map((_, index) => (
+          <i key={index} className={index < filled ? 'on' : undefined} style={{ ['--i' as string]: index }} />
+        ))}
       </div>
     </div>
   )

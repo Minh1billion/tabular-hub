@@ -1,4 +1,4 @@
-import { cn } from '@/shared/lib/cn'
+import { ChevronIcon } from '@/shared/components/ui/icons'
 
 const FAQ_ITEMS = [
   {
@@ -17,24 +17,19 @@ const FAQ_ITEMS = [
 
 export function NeedHelpCard() {
   return (
-    <div className="bg-white border-2 border-black rounded-card p-5 flex flex-col gap-4">
-      <h3 className="font-headline font-semibold text-[15px]">Need help?</h3>
-      <div className="flex flex-col">
-        {FAQ_ITEMS.map((item, index) => (
-          <div key={item.question} className={cn('flex gap-3 py-3', index > 0 && 'border-t border-line')}>
-            <span
-              className="w-5 h-5 shrink-0 rounded-full flex items-center justify-center font-mono text-[11px] text-brand-deep"
-              style={{ background: 'color-mix(in srgb, var(--brand) 16%, white)' }}
-            >
-              ?
-            </span>
-            <div className="text-[13.5px]">
-              <p className="font-medium text-ink mb-1">{item.question}</p>
-              <p className="text-slate">{item.answer}</p>
-            </div>
-          </div>
-        ))}
+    <div className="panel faq">
+      <div className="faq-head">
+        <h3>Need help?</h3>
       </div>
+      {FAQ_ITEMS.map((item, index) => (
+        <details key={item.question} open={index === 0}>
+          <summary>
+            {item.question}
+            <ChevronIcon />
+          </summary>
+          <p>{item.answer}</p>
+        </details>
+      ))}
     </div>
   )
 }

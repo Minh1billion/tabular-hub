@@ -1,87 +1,81 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { cn } from '@/shared/lib/cn'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import logo from '@/assets/logo.svg'
+import { EdgeToggle } from '@/shared/components/ui/EdgeToggle'
+import { BoltIcon, CardIcon, GridIcon, HomeIcon } from '@/shared/components/ui/icons'
+import { useSubscription } from '@/modules/billing/hooks'
 
-export function AppSidebar() {
-  const location = useLocation()
-  const isHomeActive = location.pathname === '/'
-  const isWorkspacesActive = location.pathname.startsWith('/workspaces')
-  const isBillingActive = location.pathname.startsWith('/billing')
+const items = [
+  { to: '/', label: 'Home', Icon: HomeIcon, match: (p: string) => p === '/' },
+  { to: '/workspaces', label: 'Workspaces', Icon: GridIcon, match: (p: string) => p.startsWith('/workspaces') },
+  { to: '/billing', label: 'Billing', Icon: CardIcon, match: (p: string) => p.startsWith('/billing') },
+]
 
-  const homeRef = useRef<HTMLAnchorElement>(null)
-  const workspacesRef = useRef<HTMLAnchorElement>(null)
-  const billingRef = useRef<HTMLAnchorElement>(null)
-  const [highlightY, setHighlightY] = useState(0)
+interface AppSidebarProps {
+  collapsed: boolean
+  onToggle: () => void
+}
 
-  useLayoutEffect(() => {
-    const el = isHomeActive ? homeRef.current : isWorkspacesActive ? workspacesRef.current : billingRef.current
-    if (el) setHighlightY(el.offsetTop)
-  }, [isHomeActive, isWorkspacesActive, isBillingActive])
+export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
+  const { pathname } = useLocation()
+  const { data: subscription } = useSubscription()
+
+  const activeIndex = items.findIndex((i) => i.match(pathname))
 
   return (
-    <nav className="relative w-14 bg-white border-r border-line flex flex-col items-center py-4 gap-1.5">
-      <div
-        className="absolute left-1/2 top-0 w-9 h-9 rounded-[9px] bg-[#32664d] transition-transform duration-300 ease-out"
-        style={{ transform: `translate(-50%, ${highlightY}px)` }}
-      />
+    <aside className="side">
+      <EdgeToggle collapsed={collapsed} onClick={onToggle} label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} />
+      <div className="side-head">
+        <Link to="/" className="brand" aria-label="Tabular Hub">
+          <img src={logo} alt="" />
+          <span className="side-label">
+            Tabular<b>Hub</b>
+          </span>
+        </Link>
+      </div>
 
-      <Link
-        ref={homeRef}
-        to="/"
-        title="Home"
-        aria-label="Home"
-        className={cn(
-          'relative z-10 w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
-          isHomeActive
-            ? 'border-2 border-black bg-[#32664d] text-[#f5f5ef]'
-            : 'border-[1.5px] border-[#ddddc4] text-slate hover:bg-cream-soft',
-        )}
-      >
-        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M4 11.5 12 4l8 7.5" />
-          <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" />
-        </svg>
-      </Link>
+      <nav className="side-nav" aria-label="Main">
+        <span className="side-section">Menu</span>
+        {items.map(({ to, label, Icon }, i) => (
+          <div key={to} className="nav-item">
+            <NavLink to={to} end={to === '/'} aria-label={label} className={i === activeIndex ? 'active' : undefined}>
+              <span className="nav-ico">
+                <Icon />
+              </span>
+              <span className="side-label">{label}</span>
+            </NavLink>
+            <span className="nav-tip" role="tooltip">
+              {label}
+            </span>
+          </div>
+        ))}
+      </nav>
 
-      <div className="w-6 h-px bg-line my-0.5" />
+      <div className="side-foot">
+        <div className="nav-item">
+          <Link to="/billing" className="plan-chip" aria-label="Plan">
+            <BoltIcon />
+            <strong>{subscription?.tier ?? 'free'}</strong>
+            <small>Plan</small>
+          </Link>
+          <span className="nav-tip" role="tooltip">
+            {subscription?.tier ?? 'free'} plan
+          </span>
+        </div>
+      </div>
+    </aside>
+  )
+}
 
-      <Link
-        ref={workspacesRef}
-        to="/workspaces"
-        title="Workspaces"
-        aria-label="Workspaces"
-        className={cn(
-          'relative z-10 w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
-          isWorkspacesActive
-            ? 'border-2 border-black bg-[#32664d] text-[#f5f5ef]'
-            : 'border-[1.5px] border-[#ddddc4] text-slate hover:bg-cream-soft',
-        )}
-      >
-        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <rect x="4" y="4" width="16" height="16" rx="2" />
-          <path d="M4 10h16M10 10v10" />
-        </svg>
-      </Link>
-
-      <div className="w-6 h-px bg-line my-0.5" />
-
-      <Link
-        ref={billingRef}
-        to="/billing"
-        title="Billing"
-        aria-label="Billing"
-        className={cn(
-          'relative z-10 w-9 h-9 flex items-center justify-center rounded-[9px] transition-colors',
-          isBillingActive
-            ? 'border-2 border-black bg-[#32664d] text-[#f5f5ef]'
-            : 'border-[1.5px] border-[#ddddc4] text-slate hover:bg-cream-soft',
-        )}
-      >
-        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <rect x="2" y="5" width="20" height="14" rx="2" />
-          <path d="M2 10h20" />
-        </svg>
-      </Link>
+export function MobileNav() {
+  const { pathname } = useLocation()
+  return (
+    <nav className="mobile-nav" aria-label="Main">
+      {items.map(({ to, label, Icon, match }) => (
+        <Link key={to} to={to} className={match(pathname) ? 'active' : undefined}>
+          <Icon />
+          {label}
+        </Link>
+      ))}
     </nav>
   )
 }

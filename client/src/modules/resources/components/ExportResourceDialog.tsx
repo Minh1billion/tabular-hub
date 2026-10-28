@@ -2,11 +2,15 @@ import { FormEvent, useState } from 'react'
 import { Modal } from '@/shared/components/ui/Modal'
 import { Button } from '@/shared/components/ui/Button'
 import { Badge } from '@/shared/components/ui/Badge'
+import { Field } from '@/shared/components/ui/Field'
+import { Segmented } from '@/shared/components/ui/Segmented'
+import { TableIcon } from '@/shared/components/ui/icons'
+import { cn } from '@/shared/lib/cn'
 import { useRunTracking } from '@/modules/runs/hooks-tracking'
 import { useRunEventHistory } from '@/modules/runs/hooks-event-history'
 import { useExportDownloadUrl, useExportResource } from '../hooks'
 
-const FORMATS = ['csv', 'parquet', 'arrow', 'json']
+const FORMATS = ['csv', 'parquet', 'arrow', 'json'].map((value) => ({ value, label: value }))
 
 interface ExportResourceDialogProps {
   workspaceId: string
@@ -50,76 +54,68 @@ export function ExportResourceDialog({ workspaceId, resourceKey, onClose }: Expo
   }
 
   return (
-    <Modal title="Export resource" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">Dataset</label>
-          <div className="px-3 py-2 text-xs font-mono border border-line rounded-lg bg-[#f4f6f2] text-ink truncate">
-            {resourceKey}
+    <Modal title="Export dataset" onClose={onClose}>
+      <form onSubmit={handleSubmit}>
+        <div className="dlg-status" style={{ background: 'var(--white)' }}>
+          <span className="cat-tile" data-cat="IO" style={{ width: 28, height: 28, border: 'var(--edge)', borderRadius: 7 }}>
+            <TableIcon className="w-3.5 h-3.5" />
+          </span>
+          <span className="grow font-mono font-semibold">{resourceKey}</span>
+        </div>
+
+        <Field label="Format">
+          <Segmented value={format} options={FORMATS} onChange={handleFormatChange} className={cn(running && 'pointer-events-none opacity-60')} />
+        </Field>
+
+        {running && (
+          <div className="dlg-progress">
+            <div className="bar indet">
+              <i />
+            </div>
+            <small>Preparing {downloadFilename}…</small>
           </div>
-        </div>
+        )}
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-mono text-muted uppercase">Format</label>
-          <select
-            value={format}
-            onChange={(event) => handleFormatChange(event.target.value)}
-            disabled={running || exportResource.isPending}
-            className="w-full px-3 py-2 text-sm border border-line rounded-lg bg-white text-ink outline-none focus:border-brand transition-colors disabled:opacity-50"
-          >
-            {FORMATS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {exportResource.isError && <p className="text-[12px] text-warn">{exportResource.error.message}</p>}
+        {exportResource.isError && <div className="dlg-status fail">{exportResource.error.message}</div>}
         {isDownloadError && (
-          <p className="text-[12px] text-warn">
+          <div className="dlg-status fail">
             {downloadError instanceof Error ? downloadError.message : 'Failed to prepare download link'}
-          </p>
+          </div>
         )}
 
         {run && (
-          <div className="flex items-center gap-2 text-[12px]">
-            <Badge tone={failed ? 'error' : completed ? 'success' : 'pending'}>{run.status}</Badge>
-            {running && <span className="text-slate text-[11px]">Preparing {downloadFilename}…</span>}
-            {completed && downloadUrl && (
-              <span className="text-slate font-mono text-[11px]">Ready: {downloadFilename}</span>
+          <div className={cn('dlg-status', failed && 'fail', completed && 'ok')}>
+            <Badge tone={failed ? 'error' : completed ? 'success' : 'pending'}>
+              <i className={cn('bdot', running && 'live')} />
+              {run.status}
+            </Badge>
+            {failed && <span className="grow">{errorMessage ?? 'Export failed'}</span>}
+            {completed && (
+              <span className="grow">{downloadUrl ? `Ready: ${downloadFilename}` : 'Preparing download link…'}</span>
             )}
-            {failed && <span className="text-warn truncate">{errorMessage ?? 'Export failed'}</span>}
           </div>
         )}
 
-        <div className="flex items-center gap-2 justify-end pt-1">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+        <div className="modal-actions">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
             {completed ? 'Close' : 'Cancel'}
           </Button>
           {completed ? (
             downloadUrl ? (
-              <a
-                href={downloadUrl}
-                download={downloadFilename}
-                className="inline-flex items-center justify-center gap-2 font-medium transition-all active:scale-[0.98] bg-brand text-white hover:bg-brand-hover text-xs px-3 py-1.5 rounded-lg"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 4v12M7 11l5 5 5-5M5 20h14" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <a href={downloadUrl} download={downloadFilename} className="btn btn-primary btn-sm">
                 Download
               </a>
             ) : isDownloadError ? (
-              <Button type="button" variant="primary" size="sm" onClick={() => refetchDownloadUrl()}>
+              <Button type="button" size="sm" onClick={() => refetchDownloadUrl()}>
                 Retry link
               </Button>
             ) : (
-              <Button type="button" variant="primary" size="sm" disabled={isPreparingDownload}>
+              <Button type="button" size="sm" loading={isPreparingDownload} disabled>
                 Preparing…
               </Button>
             )
           ) : (
-            <Button type="submit" variant="primary" size="sm" disabled={exportResource.isPending || running}>
+            <Button type="submit" size="sm" loading={exportResource.isPending} disabled={exportResource.isPending || running}>
               {exportResource.isPending ? 'Starting…' : running ? 'Exporting…' : 'Export'}
             </Button>
           )}

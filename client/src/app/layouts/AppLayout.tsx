@@ -1,21 +1,24 @@
 import { Outlet } from 'react-router-dom'
 import { AppHeader } from './components/AppHeader'
-import { AppSidebar } from './components/AppSidebar'
-import { AppFooter } from './components/AppFooter'
+import { AppSidebar, MobileNav } from './components/AppSidebar'
 import { AuthGuard } from '@/modules/auth/components/AuthGuard'
+import { useSidebarCollapsed } from '@/shared/hooks/useSidebarCollapsed'
+import { cn } from '@/shared/lib/cn'
 
 export function AppLayout() {
+  const { collapsed, toggle } = useSidebarCollapsed()
+
   return (
     <AuthGuard>
-      <div className="h-screen flex flex-col">
-        <AppHeader />
-        <div className="flex-1 flex min-h-0">
-          <AppSidebar />
-          <div className="flex-1 min-h-0 overflow-auto">
+      <div className={cn('shell', collapsed && 'collapsed')}>
+        <AppSidebar collapsed={collapsed} onToggle={toggle} />
+        <div className="main">
+          <AppHeader />
+          <div className="main-body">
             <Outlet />
           </div>
         </div>
-        <AppFooter />
+        <MobileNav />
       </div>
     </AuthGuard>
   )

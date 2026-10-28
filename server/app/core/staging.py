@@ -42,13 +42,14 @@ def new_key(workspace_id: str, filename: str) -> str:
     return f"{workspace_id}/{uuid.uuid4()}-{filename}"
 
 
-def presign_put(key: str) -> str:
+def presign_post(key: str, max_size_bytes: int) -> dict:
     if is_local():
         base = settings.OAUTH_REDIRECT_BASE_URL.rstrip("/")
-        return f"{base}/staging/{quote(key, safe='/')}"
-    return _presign_client.generate_presigned_url(
-        "put_object",
-        Params={"Bucket": settings.STAGING_S3_BUCKET_NAME, "Key": key},
+        return {"url": f"{base}/staging/{quote(key, safe='/')}", "fields": {}}
+    return _presign_client.generate_presigned_post(
+        Bucket=settings.STAGING_S3_BUCKET_NAME,
+        Key=key,
+        Conditions=[["content-length-range", 0, max_size_bytes]],
         ExpiresIn=settings.STAGING_URL_TTL_SECONDS,
     )
 

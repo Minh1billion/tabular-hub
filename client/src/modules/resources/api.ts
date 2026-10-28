@@ -23,8 +23,9 @@ export function deleteResource(workspaceId: string, key: string) {
   return apiClient.delete<void>(`/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}`)
 }
 
-function putToStaging(
+function postToStaging(
   uploadUrl: string,
+  fields: Record<string, string>,
   file: File,
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
@@ -35,8 +36,12 @@ function putToStaging(
       return
     }
 
+    const formData = new FormData()
+    Object.entries(fields).forEach(([field, value]) => formData.append(field, value))
+    formData.append('file', file)
+
     const xhr = new XMLHttpRequest()
-    xhr.open('PUT', uploadUrl)
+    xhr.open('POST', uploadUrl)
 
     const handleAbort = () => {
       xhr.abort()
@@ -54,7 +59,7 @@ function putToStaging(
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve()
       } else {
-        reject(new Error('Upload failed'))
+        reject(new Error(xhr.status === 413 ? 'File exceeds allowed size' : 'Upload failed'))
       }
     }
     xhr.onerror = () => {
@@ -65,7 +70,7 @@ function putToStaging(
       signal?.removeEventListener('abort', handleAbort)
       reject(new DOMException('Upload cancelled', 'AbortError'))
     }
-    xhr.send(file)
+    xhr.send(formData)
   })
 }
 
@@ -81,13 +86,14 @@ export async function importResource(
     format: payload.format,
     overwrite: payload.overwrite,
     idempotency_key: crypto.randomUUID(),
+    content_length: payload.file.size,
   })
 
   if (signal?.aborted) {
     throw new DOMException('Upload cancelled', 'AbortError')
   }
 
-  await putToStaging(presign.upload_url, payload.file, onProgress, signal)
+  await postToStaging(presign.upload_url, presign.upload_fields, payload.file, onProgress, signal)
 
   if (signal?.aborted) {
     throw new DOMException('Upload cancelled', 'AbortError')
