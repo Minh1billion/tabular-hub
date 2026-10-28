@@ -8,9 +8,10 @@ const TONE: Record<string, 'success' | 'error' | 'pending'> = {
   cancelling: 'pending',
   running: 'pending',
   queued: 'pending',
+  pending_upload: 'pending',
 }
 
-const LIVE = ['running', 'queued', 'cancelling']
+const LIVE = ['running', 'queued', 'cancelling', 'pending_upload']
 
 export function RunBadge({ status }: { status: string }) {
   return (

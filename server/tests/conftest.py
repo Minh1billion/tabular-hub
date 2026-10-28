@@ -13,6 +13,11 @@ os.environ.setdefault("ENGINE_BACKEND", "local")
 os.environ.setdefault("STAGING_S3_ENDPOINT_URL", "http://localhost:9000")
 os.environ.setdefault("STAGING_S3_ACCESS_KEY_ID", "test")
 os.environ.setdefault("STAGING_S3_SECRET_ACCESS_KEY", "test")
+os.environ.setdefault("STRIPE_SECRET_KEY", "test")
+os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "test")
+os.environ.setdefault("STRIPE_PUBLISHABLE_KEY", "test")
+os.environ.setdefault("STRIPE_PRICE_ID_PRO", "test")
+os.environ.setdefault("STRIPE_PRICE_ID_TEAM", "test")
 
 import fakeredis
 from fakeredis import aioredis as fakeaioredis

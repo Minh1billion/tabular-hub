@@ -53,12 +53,14 @@ def validate(
 
 @router.get("", response_model=list[RunRead])
 def list_(
+    status: str | None = Query(None),
+    kind: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     workspace: Workspace = Depends(get_owned_workspace),
     db: Session = Depends(get_db),
 ):
-    return service.list_runs(db, workspace_id=workspace.id, limit=limit, offset=offset)
+    return service.list_runs(db, workspace_id=workspace.id, status=status, kind=kind, limit=limit, offset=offset)
 
 @router.get("/{run_id}", response_model=RunRead)
 def get(

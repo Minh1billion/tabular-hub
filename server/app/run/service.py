@@ -27,11 +27,22 @@ def create_run(db: Session, *, workspace: Workspace, spec: dict[str, Any], idemp
     db.refresh(run)
     return run
 
-def list_runs(db: Session, *, workspace_id: uuid.UUID, limit: int = 20, offset: int = 0) -> list[Run]:
+def list_runs(
+    db: Session,
+    *,
+    workspace_id: uuid.UUID,
+    status: str | None = None,
+    kind: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[Run]:
+    q = db.query(Run).filter(Run.workspace_id == workspace_id)
+    if status:
+        q = q.filter(Run.status == status)
+    if kind:
+        q = q.filter(Run.kind == kind)
     return (
-        db.query(Run)
-        .filter(Run.workspace_id == workspace_id)
-        .order_by(Run.created_at.desc())
+        q.order_by(Run.created_at.desc())
         .offset(offset)
         .limit(limit)
         .all()

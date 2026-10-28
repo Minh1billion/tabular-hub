@@ -38,6 +38,14 @@ def _should_persist_progress(state: dict[str, tuple[float, float | None]], event
 def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
     bucket = str(run.workspace_id)
     if run.kind == "import":
+        if staging.is_local():
+            return engine_lifecycle.engine.data_resource.import_source(
+                key=run.spec["key"],
+                source_kind="file",
+                source_params={"format": run.spec["format"], "path": str(staging.local_path(run.spec["staging_key"]))},
+                bucket=bucket,
+                overwrite=run.spec["overwrite"],
+            )
         return engine_lifecycle.engine.data_resource.import_source(
             key=run.spec["key"],
             source_kind="s3",
@@ -46,6 +54,14 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
             overwrite=run.spec["overwrite"],
         )
     if run.kind == "export":
+        if staging.is_local():
+            return engine_lifecycle.engine.data_resource.export(
+                key=run.spec["key"],
+                writer_kind="file",
+                writer_params={"path": str(staging.local_path(run.spec["staging_key"]))},
+                format=run.spec["format"],
+                bucket=bucket,
+            )
         return engine_lifecycle.engine.data_resource.export(
             key=run.spec["key"],
             writer_kind="s3",
