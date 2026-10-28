@@ -38,6 +38,14 @@ def _should_persist_progress(state: dict[str, tuple[float, float | None]], event
 def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
     bucket = str(run.workspace_id)
     if run.kind == "import":
+        if staging.is_local():
+            return engine_lifecycle.engine.data_resource.import_source(
+                key=run.spec["key"],
+                source_kind="file",
+                source_params={"format": run.spec["format"], "path": str(staging.local_path(run.spec["staging_key"]))},
+                bucket=bucket,
+                overwrite=run.spec["overwrite"],
+            )
         return engine_lifecycle.engine.data_resource.import_source(
             key=run.spec["key"],
             source_kind="s3",
@@ -46,6 +54,14 @@ def _run_events(engine_lifecycle: EngineLifecycle, run: Run, run_id: str):
             overwrite=run.spec["overwrite"],
         )
     if run.kind == "export":
+        if staging.is_local():
+            return engine_lifecycle.engine.data_resource.export(
+                key=run.spec["key"],
+                writer_kind="file",
+                writer_params={"path": str(staging.local_path(run.spec["staging_key"]))},
+                format=run.spec["format"],
+                bucket=bucket,
+            )
         return engine_lifecycle.engine.data_resource.export(
             key=run.spec["key"],
             writer_kind="s3",
@@ -74,41 +90,58 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
         seq = 0
         progress_state: dict[str, tuple[float, float | None]] = {}
 
-        for event in _run_events(engine_lifecycle, run, run_id):
-            persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
+        try:
+            for event in _run_events(engine_lifecycle, run, run_id):
+                persist = event["event"] != "node_progress" or _should_persist_progress(progress_state, event)
 
-            if persist:
-                db.add(
-                    RunEvent(
-                        run_id=run.id,
-                        attempt=run.attempt,
-                        seq=seq,
-                        event=event["event"],
-                        data=event,
-                        ts=datetime.fromisoformat(event["ts"]),
-                    )
-                )
-                db.commit()
-                seq += 1
-
-                if event["event"] == "compiled":
-                    run.execution_id = event["data"]["execution_id"]
-                    db.commit()
-                elif event["event"] in ("completed", "failed", "cancelled"):
-                    run.status = event["event"]
-                    if event["event"] == "completed" and run.kind == "import":
-                        usage = (
-                            db.query(ResourceUsage)
-                            .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
-                            .first()
+                if persist:
+                    db.add(
+                        RunEvent(
+                            run_id=run.id,
+                            attempt=run.attempt,
+                            seq=seq,
+                            event=event["event"],
+                            data=event,
+                            ts=datetime.fromisoformat(event["ts"]),
                         )
-                        if usage:
-                            usage.size_bytes = run.spec["size_bytes"]
-                        else:
-                            db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                    )
                     db.commit()
+                    seq += 1
 
-            publish_event(str(run.id), event)
+                    if event["event"] == "compiled":
+                        run.execution_id = event["data"]["execution_id"]
+                        db.commit()
+                    elif event["event"] in ("completed", "failed", "cancelled"):
+                        run.status = event["event"]
+                        if event["event"] == "completed" and run.kind == "import":
+                            usage = (
+                                db.query(ResourceUsage)
+                                .filter(ResourceUsage.workspace_id == run.workspace_id, ResourceUsage.key == run.spec["key"])
+                                .first()
+                            )
+                            if usage:
+                                usage.size_bytes = run.spec["size_bytes"]
+                            else:
+                                db.add(ResourceUsage(workspace_id=run.workspace_id, key=run.spec["key"], size_bytes=run.spec["size_bytes"]))
+                        db.commit()
+
+                publish_event(str(run.id), event)
+        except Exception as exc:
+            now_iso = datetime.utcnow().isoformat()
+            failed_event = {"event": "failed", "error": str(exc), "ts": now_iso}
+            db.add(
+                RunEvent(
+                    run_id=run.id,
+                    attempt=run.attempt,
+                    seq=seq,
+                    event="failed",
+                    data=failed_event,
+                    ts=datetime.fromisoformat(now_iso),
+                )
+            )
+            run.status = "failed"
+            db.commit()
+            publish_event(str(run.id), failed_event)
 
         clear_cancel(run_id)
         engine_lifecycle.touch_bucket(str(run.workspace_id))

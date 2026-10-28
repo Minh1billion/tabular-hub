@@ -23,10 +23,12 @@ class PresignUploadRequest(BaseModel):
     format: str = "csv"
     overwrite: bool = False
     idempotency_key: str = Field(min_length=1, max_length=200)
+    content_length: int = Field(gt=0)
 
 class PresignUploadResponse(BaseModel):
     run_id: str
     upload_url: str
+    upload_fields: dict[str, str]
     staging_key: str
 
 class ExportDownloadResponse(BaseModel):

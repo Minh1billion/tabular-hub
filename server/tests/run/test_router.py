@@ -107,6 +107,42 @@ def test_list_runs_empty(auth_client, workspace):
     assert response.status_code == 200
     assert response.json() == []
 
+def test_list_runs_filter_by_status_and_kind(auth_client, workspace, db_session):
+    from app.run.models import Run
+
+    r1 = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "filter-1"},
+    ).json()
+    r2 = auth_client.post(
+        f"/workspaces/{workspace['id']}/runs",
+        json={"spec": {"nodes": []}, "idempotency_key": "filter-2"},
+    ).json()
+
+    # Mark r1 as failed and kind as import
+    db_session.query(Run).filter(Run.id == r1["id"]).update({"status": "failed", "kind": "import"})
+    db_session.commit()
+
+    resp_failed = auth_client.get(f"/workspaces/{workspace['id']}/runs?status=failed")
+    assert resp_failed.status_code == 200
+    assert len(resp_failed.json()) == 1
+    assert resp_failed.json()[0]["id"] == r1["id"]
+
+    resp_queued = auth_client.get(f"/workspaces/{workspace['id']}/runs?status=queued")
+    assert resp_queued.status_code == 200
+    assert len(resp_queued.json()) == 1
+    assert resp_queued.json()[0]["id"] == r2["id"]
+
+    resp_kind_import = auth_client.get(f"/workspaces/{workspace['id']}/runs?kind=import")
+    assert resp_kind_import.status_code == 200
+    assert len(resp_kind_import.json()) == 1
+    assert resp_kind_import.json()[0]["id"] == r1["id"]
+
+    resp_kind_pipeline = auth_client.get(f"/workspaces/{workspace['id']}/runs?kind=pipeline")
+    assert resp_kind_pipeline.status_code == 200
+    assert len(resp_kind_pipeline.json()) == 1
+    assert resp_kind_pipeline.json()[0]["id"] == r2["id"]
+
 def test_validate_valid_spec(auth_client, workspace):
     _seed_raw_resource(workspace["id"])
     spec = {

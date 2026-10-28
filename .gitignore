@@ -1,2 +1,5 @@
 # Environments
 .env
+.agents
+.tm
+skills-lock.json

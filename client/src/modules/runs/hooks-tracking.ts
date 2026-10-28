@@ -18,6 +18,7 @@ export function useRunTracking(workspaceId: string | undefined, runId: string | 
     queryFn: () => getRun(workspaceId!, runId!),
     enabled: Boolean(workspaceId) && Boolean(runId),
     refetchOnWindowFocus: false,
+    refetchInterval: (q) => (isTerminal(q.state.data?.status) ? false : 1500),
   })
 
   const status = query.data?.status
@@ -34,6 +35,7 @@ export function useRunTracking(workspaceId: string | undefined, runId: string | 
       const parsed = JSON.parse(message.data) as { event: string }
       if (isTerminal(parsed.event)) {
         queryClient.setQueryData<Run>(queryKey, (prev) => (prev ? { ...prev, status: parsed.event } : prev))
+        queryClient.invalidateQueries({ queryKey })
         source.close()
       }
     }

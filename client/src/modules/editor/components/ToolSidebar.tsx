@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react'
+import { ComponentType, SVGProps, useEffect, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { NodeLibrary } from '@/modules/editor/types'
+import { useHotkeys } from '@/shared/hooks/useHotkeys'
+import { bind } from '../shortcuts'
+import { EdgeToggle } from '@/shared/components/ui/EdgeToggle'
+import { NodesIcon, TableIcon } from '@/shared/components/ui/icons'
 import { NodePalette } from '@/modules/editor/nodes/components/NodePalette'
 import { ResourceSidebarList } from '@/modules/resources/components/ResourceSidebarList'
 import { ResourceInspector } from '@/modules/resources/components/ResourceInspector'
 
 type ToolTab = 'nodes' | 'resources'
+
+const TABS: { id: ToolTab; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { id: 'nodes', label: 'Nodes', Icon: NodesIcon },
+  { id: 'resources', label: 'Resources', Icon: TableIcon },
+]
 
 interface ToolSidebarProps {
   workspaceId: string
@@ -13,96 +22,74 @@ interface ToolSidebarProps {
 }
 
 export function ToolSidebar({ workspaceId, nodeLibrary }: ToolSidebarProps) {
-  const [isOpen, setIsOpen] = useState(() => localStorage.getItem('toolSidebar.isOpen') !== 'false')
-  const [activeTab, setActiveTab] = useState<ToolTab>(
-    () => (localStorage.getItem('toolSidebar.tab') as ToolTab | null) ?? 'nodes',
-  )
+  const [isOpen, setIsOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState<ToolTab>(() => (localStorage.getItem('toolSidebar.tab') as ToolTab | null) ?? 'nodes')
   const [activeResourceKey, setActiveResourceKey] = useState<string | null>(() =>
     localStorage.getItem(`toolSidebar.activeResourceKey:${workspaceId}`),
   )
 
-  useEffect(() => {
-    localStorage.setItem('toolSidebar.isOpen', String(isOpen))
-  }, [isOpen])
-
-  useEffect(() => {
-    localStorage.setItem('toolSidebar.tab', activeTab)
-  }, [activeTab])
-
+  useEffect(() => localStorage.setItem('toolSidebar.tab', activeTab), [activeTab])
   useEffect(() => {
     if (activeResourceKey) localStorage.setItem(`toolSidebar.activeResourceKey:${workspaceId}`, activeResourceKey)
     else localStorage.removeItem(`toolSidebar.activeResourceKey:${workspaceId}`)
   }, [workspaceId, activeResourceKey])
 
+  useHotkeys(bind('sidebar', () => setIsOpen((open) => !open)))
+
+  function selectTab(tab: ToolTab) {
+    if (isOpen && activeTab === tab) {
+      setIsOpen(false)
+      return
+    }
+    setActiveTab(tab)
+    setIsOpen(true)
+  }
+
+  const current = TABS.find((tab) => tab.id === activeTab) ?? TABS[0]
+
   return (
     <>
-      <div
-        className={cn(
-          'my-3 ml-3 border-2 border-black rounded-panel bg-white flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out',
-          isOpen ? 'w-[264px]' : 'w-[60px]',
-        )}
-      >
-        <div
-          className={cn(
-            'flex items-center px-3 py-3 border-b-2 border-black shrink-0',
-            isOpen ? 'justify-between' : 'justify-center',
-          )}
-        >
-          {isOpen ? (
-            <div className="flex items-center gap-1 bg-cream-soft rounded-lg p-0.5">
-              <button
-                type="button"
-                onClick={() => setActiveTab('nodes')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors',
-                  activeTab === 'nodes' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink',
-                )}
-              >
-                Nodes
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('resources')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors',
-                  activeTab === 'resources' ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink',
-                )}
-              >
-                Resources
-              </button>
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setIsOpen((current) => !current)}
-            className="text-muted hover:text-ink transition-colors shrink-0"
-          >
-            <svg
-              className={cn('w-3.5 h-3.5 transition-transform', isOpen ? '' : 'rotate-180')}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+      <aside className={cn('ed-tools', !isOpen && 'closed')}>
+        <EdgeToggle collapsed={!isOpen} onClick={() => setIsOpen((open) => !open)} label={isOpen ? 'Collapse panel' : 'Expand panel'} />
+        <nav className="tool-rail" aria-label="Editor tools">
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={cn('tool-rail-btn tip-host', isOpen && activeTab === id && 'on')}
+              data-tip={label}
+              data-side="right"
+              aria-label={label}
+              aria-pressed={isOpen && activeTab === id}
+              onClick={() => selectTab(id)}
             >
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
+              <Icon />
+            </button>
+          ))}
+        </nav>
+
+        <div className="tool-panel" aria-hidden={!isOpen}>
+          <div className="tool-panel-inner">
+            <header className="tool-panel-head">
+              <current.Icon />
+              <h3>{current.label}</h3>
+            </header>
+            <div className="tool-panel-body">
+              {activeTab === 'nodes' && <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} />}
+              {activeTab === 'resources' && (
+                <ResourceSidebarList
+                  workspaceId={workspaceId}
+                  activeKey={activeResourceKey}
+                  onSelect={setActiveResourceKey}
+                  onDeleted={(key) => {
+                    if (key === activeResourceKey) setActiveResourceKey(null)
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
-
-        {activeTab === 'nodes' && <NodePalette workspaceId={workspaceId} nodeLibrary={nodeLibrary} isOpen={isOpen} />}
-
-        {activeTab === 'resources' && (
-          <ResourceSidebarList
-            workspaceId={workspaceId}
-            isOpen={isOpen}
-            activeKey={activeResourceKey}
-            onSelect={setActiveResourceKey}
-            onDeleted={(key) => {
-              if (key === activeResourceKey) setActiveResourceKey(null)
-            }}
-          />
-        )}
-      </div>
+      </aside>
 
       {activeResourceKey && (
         <ResourceInspector

@@ -1,0 +1,13 @@
+id,product_name,category,price,stock,rating
+1,MacBook Air,Electronics,1099.99,15,4.8
+2,Wireless Mouse,Electronics,29.99,120,4.5
+3,Mechanical Keyboard,Electronics,89.50,45,4.7
+4,USB-C Hub,Electronics,34.99,80,4.2
+5,Coffee Beans 1kg,Groceries,22.00,200,4.9
+6,Green Tea Box,Groceries,12.50,150,4.6
+7,Desk Lamp LED,Furniture,42.00,35,4.4
+8,Ergonomic Chair,Furniture,250.00,12,4.7
+9,Water Bottle 1L,Sports,18.50,90,4.3
+10,Yoga Mat,Sports,25.00,60,4.5
+11,Noise Cancelling Headphones,Electronics,199.99,28,4.8
+12,Standing Desk,Furniture,399.00,8,4.6

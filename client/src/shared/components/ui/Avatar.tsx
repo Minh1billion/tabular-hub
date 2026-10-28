@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
 
 interface AvatarProps {
@@ -8,34 +9,33 @@ interface AvatarProps {
 }
 
 function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase()
-  }
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'U'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
 export function Avatar({ name, imageUrl, size = 28, className }: AvatarProps) {
-  if (imageUrl) {
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [imageUrl])
+
+  if (imageUrl && !imgError) {
     return (
       <img
         src={imageUrl}
         alt={name}
         width={size}
         height={size}
-        className={cn('rounded-full object-cover', className)}
+        onError={() => setImgError(true)}
+        className={cn('avatar', className)}
       />
     )
   }
-
   return (
-    <div
-      className={cn(
-        'rounded-full bg-brand-deep text-brand-tint flex items-center justify-center font-headline font-semibold',
-        className,
-      )}
-      style={{ width: size, height: size, fontSize: size * 0.4 }}
-    >
+    <div className={cn('avatar', className)} style={{ width: size, height: size, fontSize: size * 0.4 }}>
       {getInitials(name)}
     </div>
   )

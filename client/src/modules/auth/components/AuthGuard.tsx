@@ -7,15 +7,13 @@ export function AuthGuard({ children }: PropsWithChildren) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-cream">
-        <span className="font-mono text-xs text-muted">Loading…</span>
+      <div className="splash">
+        <div className="spinner" />
       </div>
     )
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
+  if (!user) return <Navigate to="/login" replace />
 
   return <>{children}</>
 }
