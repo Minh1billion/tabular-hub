@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/shared/lib/cn'
+import { Modal } from '@/shared/components/ui/Modal'
+import { Button } from '@/shared/components/ui/Button'
 import { resourcesQueryKey, useDeleteResource, useResources } from '../hooks'
 import { ExportResourceDialog } from './ExportResourceDialog'
 import { ImportResourceDialog } from './ImportResourceDialog'
@@ -23,17 +25,19 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
 
   const keys = resources?.keys ?? []
 
-  function handleDelete(key: string) {
-    if (confirmingKey !== key) {
-      setConfirmingKey(key)
-      return
-    }
-    deleteResource.mutate(key, {
+  function handleRequestDelete(key: string) {
+    deleteResource.reset()
+    setConfirmingKey(key)
+  }
+
+  function handleConfirmDelete() {
+    if (!confirmingKey) return
+    const keyToDelete = confirmingKey
+    deleteResource.mutate(keyToDelete, {
       onSuccess: () => {
         setConfirmingKey(null)
-        onDeleted(key)
+        onDeleted(keyToDelete)
       },
-      onError: () => setConfirmingKey(null),
     })
   }
 
@@ -113,12 +117,9 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(key)}
-                disabled={deleteResource.isPending && confirmingKey === key}
-                className={cn(
-                  'shrink-0 transition-colors',
-                  confirmingKey === key ? 'text-warn' : 'text-muted hover:text-warn',
-                )}
+                title="Delete dataset"
+                onClick={() => handleRequestDelete(key)}
+                className="shrink-0 text-muted hover:text-warn transition-colors"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" />
@@ -138,7 +139,6 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
           onClose={() => setIsImporting(false)}
           onImported={() => {
             queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
-            setIsImporting(false)
           }}
         />
       )}
@@ -149,6 +149,51 @@ export function ResourceSidebarList({ workspaceId, isOpen, activeKey, onSelect, 
           resourceKey={exportingKey}
           onClose={() => setExportingKey(null)}
         />
+      )}
+
+      {confirmingKey && (
+        <Modal
+          title="Delete dataset"
+          onClose={() => !deleteResource.isPending && setConfirmingKey(null)}
+          className="w-[400px]"
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-warn-tint text-warn flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="text-sm text-slate leading-relaxed">
+                Are you sure you want to delete dataset{' '}
+                <span className="font-mono font-semibold text-ink">{confirmingKey}</span>? This action cannot be undone.
+              </div>
+            </div>
+
+            {deleteResource.isError && <p className="text-[12px] text-warn">{deleteResource.error.message}</p>}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={deleteResource.isPending}
+                onClick={() => setConfirmingKey(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={deleteResource.isPending}
+                onClick={handleConfirmDelete}
+                className="bg-warn text-white hover:bg-[#a64509]"
+              >
+                {deleteResource.isPending ? 'Deleting…' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

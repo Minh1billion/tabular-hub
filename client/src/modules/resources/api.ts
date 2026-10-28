@@ -23,17 +23,48 @@ export function deleteResource(workspaceId: string, key: string) {
   return apiClient.delete<void>(`/workspaces/${workspaceId}/resources/${encodeURIComponent(key)}`)
 }
 
-function putToStaging(uploadUrl: string, file: File, onProgress?: (percent: number) => void) {
+function putToStaging(
+  uploadUrl: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
+) {
   return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Upload cancelled', 'AbortError'))
+      return
+    }
+
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl)
+
+    const handleAbort = () => {
+      xhr.abort()
+      reject(new DOMException('Upload cancelled', 'AbortError'))
+    }
+    signal?.addEventListener('abort', handleAbort, { once: true })
+
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
         onProgress(Math.round((event.loaded / event.total) * 100))
       }
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed')))
-    xhr.onerror = () => reject(new Error('Network error'))
+    xhr.onload = () => {
+      signal?.removeEventListener('abort', handleAbort)
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        reject(new Error('Upload failed'))
+      }
+    }
+    xhr.onerror = () => {
+      signal?.removeEventListener('abort', handleAbort)
+      reject(new Error('Network error'))
+    }
+    xhr.onabort = () => {
+      signal?.removeEventListener('abort', handleAbort)
+      reject(new DOMException('Upload cancelled', 'AbortError'))
+    }
     xhr.send(file)
   })
 }
@@ -42,6 +73,7 @@ export async function importResource(
   workspaceId: string,
   payload: ImportResourcePayload,
   onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
 ) {
   const presign = await apiClient.post<PresignUploadResponse>(`/workspaces/${workspaceId}/resources/presign-upload`, {
     key: payload.key,
@@ -51,7 +83,15 @@ export async function importResource(
     idempotency_key: crypto.randomUUID(),
   })
 
-  await putToStaging(presign.upload_url, payload.file, onProgress)
+  if (signal?.aborted) {
+    throw new DOMException('Upload cancelled', 'AbortError')
+  }
+
+  await putToStaging(presign.upload_url, payload.file, onProgress, signal)
+
+  if (signal?.aborted) {
+    throw new DOMException('Upload cancelled', 'AbortError')
+  }
 
   return apiClient.post<Run>(`/workspaces/${workspaceId}/resources/${presign.run_id}/confirm-upload`)
 }
