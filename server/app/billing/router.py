@@ -51,7 +51,7 @@ def subscription(
     storage_used_bytes = (
         db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
         .join(Workspace, Workspace.id == ResourceUsage.workspace_id)
-        .filter(Workspace.owner_id == current_user.id)
+        .filter(Workspace.owner_id == current_user.id, Workspace.deleted_at.is_(None))
         .scalar()
     )
 

@@ -51,23 +51,6 @@ export function ToolSidebar({ workspaceId, nodeLibrary }: ToolSidebarProps) {
     <>
       <aside className={cn('ed-tools', !isOpen && 'closed')}>
         <EdgeToggle collapsed={!isOpen} onClick={() => setIsOpen((open) => !open)} label={isOpen ? 'Collapse panel' : 'Expand panel'} />
-        <nav className="tool-rail" aria-label="Editor tools">
-          {TABS.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              className={cn('tool-rail-btn tip-host', isOpen && activeTab === id && 'on')}
-              data-tip={label}
-              data-side="right"
-              aria-label={label}
-              aria-pressed={isOpen && activeTab === id}
-              onClick={() => selectTab(id)}
-            >
-              <Icon />
-            </button>
-          ))}
-        </nav>
-
         <div className="tool-panel" aria-hidden={!isOpen}>
           <div className="tool-panel-inner">
             <header className="tool-panel-head">
@@ -89,6 +72,23 @@ export function ToolSidebar({ workspaceId, nodeLibrary }: ToolSidebarProps) {
             </div>
           </div>
         </div>
+
+        <nav className="tool-rail" aria-label="Editor tools">
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={cn('tool-rail-btn tip-host', isOpen && activeTab === id && 'on')}
+              data-tip={label}
+              data-side="left"
+              aria-label={label}
+              aria-pressed={isOpen && activeTab === id}
+              onClick={() => selectTab(id)}
+            >
+              <Icon />
+            </button>
+          ))}
+        </nav>
       </aside>
 
       {activeResourceKey && (

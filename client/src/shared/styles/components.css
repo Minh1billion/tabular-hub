@@ -43,15 +43,6 @@
 .icon-btn.flat { border-color: transparent; box-shadow: none; background: transparent; }
 .icon-btn.flat:hover:not(:disabled) { background: var(--cream-soft); border-color: var(--ink); transform: none; box-shadow: none; }
 
-.card {
-  background: var(--white); border: var(--edge); border-radius: var(--r-l); padding: 18px;
-  box-shadow: var(--shadow-1);
-}
-.card.interactive { cursor: pointer; }
-.card.interactive:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-2); }
-.card.interactive:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
-.card.highlighted { background: var(--brand-tint); box-shadow: var(--shadow-1), 6px 6px 0 var(--brand); }
-
 .input {
   width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--white);
   border: var(--edge); border-radius: var(--r-s); padding: 8px 12px; outline: none;

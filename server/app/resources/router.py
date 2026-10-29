@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -73,7 +73,7 @@ def delete_resource(
     db: Session = Depends(get_db),
     engine: Engine = Depends(get_engine),
 ):
-    service.delete_resource(db, engine, str(workspace.id), key)
+    service.delete_resource(db, engine, workspace.id, key)
 
 @router.post("/{key}/export", response_model=RunRead, status_code=status.HTTP_202_ACCEPTED)
 def export_resource(
@@ -108,18 +108,6 @@ async def post_staging_file(staging_key: str, file: UploadFile = File(...)):
     with dest.open("wb") as f:
         while chunk := await file.read(1024 * 1024):
             f.write(chunk)
-
-
-@staging_router.put("/{staging_key:path}")
-async def upload_staging_file(staging_key: str, request: Request):
-    if not staging.is_local():
-        raise HTTPException(status_code=404, detail="Local staging disabled")
-    dest = staging.local_path(staging_key)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with dest.open("wb") as f:
-        async for chunk in request.stream():
-            f.write(chunk)
-    return Response(status_code=status.HTTP_200_OK)
 
 
 @staging_router.get("/{staging_key:path}")

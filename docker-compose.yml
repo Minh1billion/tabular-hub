@@ -81,6 +81,7 @@ services:
     volumes:
       - tm_storage:/code/.tm
       - ./server/app:/code/app
+      - ./server/alembic:/code/alembic
 
   worker:
     build: ./server
@@ -100,6 +101,7 @@ services:
     volumes:
       - tm_storage:/code/.tm
       - ./server/app:/code/app
+      - ./server/alembic:/code/alembic
 
   client:
     build: ./client

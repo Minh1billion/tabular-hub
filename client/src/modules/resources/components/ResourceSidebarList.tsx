@@ -6,6 +6,7 @@ import { IconButton } from '@/shared/components/ui/IconButton'
 import { Input } from '@/shared/components/ui/Input'
 import { ExportIcon, PlusIcon, TableIcon, TrashIcon } from '@/shared/components/ui/icons'
 import { resourcesQueryKey, useDeleteResource, useResources } from '../hooks'
+import { workspacesQueryKey } from '@/modules/workspace/hooks'
 import { usePaletteDrag } from '@/modules/editor/nodes/lib/usePaletteDrag'
 import { ExportResourceDialog } from './ExportResourceDialog'
 import { ImportResourceDialog } from './ImportResourceDialog'
@@ -119,9 +120,6 @@ export function ResourceSidebarList({ workspaceId, activeKey, onSelect, onDelete
           </span>
           <span>Datasets</span>
           <em>{keys.length}</em>
-          <IconButton size="sm" tip="Import dataset" tipSide="left" onClick={() => setIsImporting(true)}>
-            <PlusIcon className="w-3.5 h-3.5" />
-          </IconButton>
         </div>
 
         {keys.length > 5 && <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search datasets…" className="mb-3" />}
@@ -175,6 +173,7 @@ export function ResourceSidebarList({ workspaceId, activeKey, onSelect, onDelete
           onClose={() => setIsImporting(false)}
           onImported={() => {
             queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
+            queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
           }}
         />
       )}

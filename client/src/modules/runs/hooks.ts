@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cancelRun, createRun, getRun, listRuns, validateSpec } from './api'
 import { Run } from './types'
+import { workspacesQueryKey } from '@/modules/workspace/hooks'
 
 export function useValidateSpec(workspaceId: string) {
   return useMutation({
@@ -63,6 +64,7 @@ export function useCreateRun(workspaceId: string) {
     mutationFn: (spec: Record<string, unknown>) => createRun(workspaceId, spec, crypto.randomUUID()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'runs'] })
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })
 }
@@ -76,6 +78,7 @@ export function useCancelRun(workspaceId: string) {
       queryClient.setQueryData(['workspaces', workspaceId, 'runs', run.id], run)
       queryClient.setQueryData(['workspaces', workspaceId, 'runs', run.id, 'status'], run)
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'runs'] })
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })
 }

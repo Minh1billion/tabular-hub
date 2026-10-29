@@ -39,14 +39,25 @@ def workspace(auth_client):
     return resp.json()
 
 @pytest.fixture
-def other_workspace(auth_client):
+def other_workspace(auth_client, db_session, test_user):
+    from app.billing.models import Subscription
+
+    db_session.add(Subscription(user_id=test_user.id, tier="pro", status="active"))
+    db_session.commit()
     resp = auth_client.post("/workspaces", json={"name": "Resources WS 2"})
     return resp.json()
 
 def _import_and_confirm(auth_client, workspace_id, key="raw", idempotency_key="import-1", content=b"a,b\n1,2\n3,4\n5,6\n"):
     presign = auth_client.post(
         f"/workspaces/{workspace_id}/resources/presign-upload",
-        json={"filename": "raw.csv", "key": key, "format": "csv", "overwrite": False, "idempotency_key": idempotency_key},
+        json={
+            "filename": "raw.csv",
+            "key": key,
+            "format": "csv",
+            "overwrite": False,
+            "idempotency_key": idempotency_key,
+            "content_length": len(content),
+        },
     )
     body = presign.json()
     with open(body["staging_key"], "wb") as f:
@@ -65,14 +76,16 @@ def test_import_resource_enqueues_run(auth_client, workspace):
     assert entries[0][1]["run_id"] == body["id"]
 
 def test_import_resource_idempotent_replay_does_not_duplicate_row(auth_client, workspace):
-    first = auth_client.post(
-        f"/workspaces/{workspace['id']}/resources/presign-upload",
-        json={"filename": "raw.csv", "key": "raw", "format": "csv", "overwrite": False, "idempotency_key": "import-dup-1"},
-    )
-    second = auth_client.post(
-        f"/workspaces/{workspace['id']}/resources/presign-upload",
-        json={"filename": "raw.csv", "key": "raw", "format": "csv", "overwrite": False, "idempotency_key": "import-dup-1"},
-    )
+    payload = {
+        "filename": "raw.csv",
+        "key": "raw",
+        "format": "csv",
+        "overwrite": False,
+        "idempotency_key": "import-dup-1",
+        "content_length": 16,
+    }
+    first = auth_client.post(f"/workspaces/{workspace['id']}/resources/presign-upload", json=payload)
+    second = auth_client.post(f"/workspaces/{workspace['id']}/resources/presign-upload", json=payload)
     assert first.json()["run_id"] == second.json()["run_id"]
 
 def test_list_resources_empty(auth_client, workspace):

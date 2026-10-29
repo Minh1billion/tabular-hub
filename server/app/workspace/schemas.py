@@ -19,3 +19,16 @@ class WorkspaceRead(BaseModel):
     owner_id: uuid.UUID
     spec: dict[str, Any] | None
     created_at: datetime
+    updated_at: datetime
+
+class WorkspaceLastRun(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    kind: str
+    status: str
+    created_at: datetime
+
+class WorkspaceListItem(WorkspaceRead):
+    dataset_count: int = 0
+    last_run: WorkspaceLastRun | None = None

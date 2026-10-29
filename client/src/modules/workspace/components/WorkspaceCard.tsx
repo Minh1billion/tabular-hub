@@ -1,39 +1,37 @@
 import { forwardRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
-import { Badge } from '@/shared/components/ui/Badge'
-import { Avatar } from '@/shared/components/ui/Avatar'
 import { Input } from '@/shared/components/ui/Input'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
 import { IconButton } from '@/shared/components/ui/IconButton'
-import { ArrowRightIcon, MoreIcon } from '@/shared/components/ui/icons'
-import { Workspace } from '../types'
+import { ArrowRightIcon, MoreIcon, NodesIcon, TableIcon } from '@/shared/components/ui/icons'
+import { RunBadge } from '@/modules/runs/components/RunBadge'
+import { WorkspaceListItem } from '../types'
 import { workspaceColorFor } from '../lib/color'
 import { openWithTransition } from '../lib/open-transition'
+import { formatAbsolute, formatRelative, nodeCount, plural, touchWorkspace } from '../lib/activity'
 import { PipelineThumb } from './PipelineThumb'
 
 interface WorkspaceCardProps {
-  workspace: Workspace
-  ownerName: string
-  isPersonal: boolean
+  workspace: WorkspaceListItem
   onDelete: (id: string) => void
   onRename: (id: string, name: string) => void
   isDeleting: boolean
   isHighlighted?: boolean
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
 export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(function WorkspaceCard(
-  { workspace, ownerName, isPersonal, onDelete, onRename, isDeleting, isHighlighted },
+  { workspace, onDelete, onRename, isDeleting, isHighlighted },
   ref,
 ) {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [nameDraft, setNameDraft] = useState(workspace.name)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  const nodes = nodeCount(workspace)
+  const editedAt = workspace.updated_at ?? workspace.created_at
+  const lastRun = workspace.last_run
 
   function submitRename() {
     const trimmed = nameDraft.trim()
@@ -43,6 +41,7 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
   }
 
   function open(card: HTMLElement) {
+    touchWorkspace(workspace.id)
     openWithTransition(card, () => navigate(`/workspaces/${workspace.id}`))
   }
 
@@ -99,14 +98,31 @@ export const WorkspaceCard = forwardRef<HTMLDivElement, WorkspaceCardProps>(func
         ) : (
           <h3 title={workspace.name}>{workspace.name}</h3>
         )}
-        <span className="date">created {formatDate(workspace.created_at)}</span>
+        <span className="date" title={`Last modified ${formatAbsolute(editedAt)}`}>
+          edited {formatRelative(editedAt)}
+        </span>
+
+        <div className="wsc-stats">
+          <span className={cn(nodes === 0 && 'zero')} title={plural(nodes, 'node') + ' in the pipeline'}>
+            <NodesIcon />
+            {plural(nodes, 'node')}
+          </span>
+          <span className={cn(workspace.dataset_count === 0 && 'zero')} title={plural(workspace.dataset_count, 'dataset') + ' imported'}>
+            <TableIcon />
+            {plural(workspace.dataset_count, 'dataset')}
+          </span>
+        </div>
       </div>
 
       <div className="wsc-foot">
-        <div className="who">
-          <Avatar name={ownerName} size={22} />
-          <Badge tone={isPersonal ? 'personal' : 'team'}>{isPersonal ? 'personal' : 'team'}</Badge>
-        </div>
+        {lastRun ? (
+          <div className="run" title={`Last run ${formatAbsolute(lastRun.created_at)}`}>
+            <RunBadge status={lastRun.status} />
+            <span>{formatRelative(lastRun.created_at)}</span>
+          </div>
+        ) : (
+          <div className="run none">Never run</div>
+        )}
         <span className="open">
           Open <ArrowRightIcon />
         </span>

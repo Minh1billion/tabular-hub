@@ -241,7 +241,6 @@ export function EditorPage() {
       </div>
 
       <div className="ed-main">
-        <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         <Canvas
           spec={spec}
           onSpecChange={setSpec}
@@ -253,6 +252,7 @@ export function EditorPage() {
           onSelectedNodeIdChange={setSelectedNodeId}
           actionsRef={actionsRef}
         />
+        <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         {selectedNode && (
           <FloatingInspector onClose={() => actionsRef.current?.deselect()}>
             <NodeInspector
