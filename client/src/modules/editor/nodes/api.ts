@@ -1,8 +1,12 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { NodeLibrary, RegisterNodePayload } from '../types'
+import { NodeLibrary, RegisterNodePayload, SchemaResponse, SchemaSpec } from '../types'
 
 export function listNodes(workspaceId: string) {
   return apiClient.get<NodeLibrary>(`/workspaces/${workspaceId}/nodes`)
+}
+
+export function inferSchema(workspaceId: string, spec: SchemaSpec) {
+  return apiClient.post<SchemaResponse>(`/workspaces/${workspaceId}/runs/schema`, { spec })
 }
 
 export function registerNode(workspaceId: string, payload: RegisterNodePayload) {
