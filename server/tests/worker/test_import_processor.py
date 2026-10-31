@@ -41,11 +41,11 @@ def _write_csv(tmp_path):
     path.write_text("a,b\n1,2\n3,4\n5,6\n")
     return str(path)
 
-def _make_import_run(db_session, workspace, staging_key, overwrite=False):
+def _make_import_run(db_session, workspace, staging_key, overwrite=False, size_bytes=16):
     run = Run(
         workspace_id=workspace.id,
         kind="import",
-        spec={"key": "raw", "format": "csv", "overwrite": overwrite, "staging_key": staging_key},
+        spec={"key": "raw", "format": "csv", "overwrite": overwrite, "staging_key": staging_key, "size_bytes": size_bytes},
         status="queued",
         idempotency_key=str(uuid.uuid4()),
     )

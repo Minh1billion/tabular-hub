@@ -11,7 +11,11 @@ def test_create_workspace(auth_client):
     body = response.json()
     assert body["name"] == "My Workspace"
 
-def test_list_workspaces(auth_client):
+def test_list_workspaces(auth_client, db_session, test_user):
+    from app.billing.models import Subscription
+
+    db_session.add(Subscription(user_id=test_user.id, tier="pro", status="active"))
+    db_session.commit()
     auth_client.post("/workspaces", json={"name": "A"})
     auth_client.post("/workspaces", json={"name": "B"})
     response = auth_client.get("/workspaces")
@@ -138,3 +142,59 @@ def test_update_workspace_requires_ownership(client, db_session):
     client.cookies.set("access_token", create_access_token(str(other.id)))
     response = client.patch(f"/workspaces/{workspace_id}", json={"name": "Hijacked"})
     assert response.status_code == 403
+
+
+def test_list_workspaces_without_activity(auth_client):
+    auth_client.post("/workspaces", json={"name": "Fresh"})
+
+    body = auth_client.get("/workspaces").json()
+    assert len(body) == 1
+    item = body[0]
+    assert item["dataset_count"] == 0
+    assert item["last_run"] is None
+    assert item["updated_at"] is not None
+
+def test_list_workspaces_includes_activity_stats(auth_client, db_session):
+    import uuid
+    from datetime import datetime, timedelta, timezone
+
+    from app.resources.models import ResourceUsage
+    from app.run.models import Run
+
+    workspace_id = uuid.UUID(auth_client.post("/workspaces", json={"name": "Busy"}).json()["id"])
+    now = datetime.now(timezone.utc)
+
+    db_session.add_all([
+        ResourceUsage(workspace_id=workspace_id, key="orders", size_bytes=10),
+        ResourceUsage(workspace_id=workspace_id, key="customers", size_bytes=20),
+        Run(workspace_id=workspace_id, kind="pipeline", spec={}, status="failed",
+            idempotency_key="old", created_at=now - timedelta(hours=2)),
+        Run(workspace_id=workspace_id, kind="pipeline", spec={}, status="completed",
+            idempotency_key="new", created_at=now - timedelta(hours=1)),
+        # Dataset imports are not pipeline activity and must not count as the "last run".
+        Run(workspace_id=workspace_id, kind="import", spec={}, status="running",
+            idempotency_key="import", created_at=now),
+    ])
+    db_session.commit()
+
+    item = auth_client.get("/workspaces").json()[0]
+    assert item["dataset_count"] == 2
+    assert item["last_run"]["status"] == "completed"
+    assert item["last_run"]["kind"] == "pipeline"
+
+def test_update_workspace_bumps_updated_at(auth_client):
+    created = auth_client.post("/workspaces", json={"name": "Before"}).json()
+
+    updated = auth_client.patch(f"/workspaces/{created['id']}", json={"name": "After"}).json()
+
+    assert updated["updated_at"] >= created["updated_at"]
+    assert updated["created_at"] == created["created_at"]
+
+def test_create_workspace_over_plan_limit_returns_402(auth_client):
+    # Free plan allows a single workspace.
+    assert auth_client.post("/workspaces", json={"name": "First"}).status_code == 201
+
+    response = auth_client.post("/workspaces", json={"name": "Second"})
+
+    assert response.status_code == 402
+    assert "limit" in response.json()["detail"].lower()

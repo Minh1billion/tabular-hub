@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.config import settings
 from app.core import staging
@@ -127,7 +127,8 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
 
                 publish_event(str(run.id), event)
         except Exception as exc:
-            now_iso = datetime.utcnow().isoformat()
+            now_dt = datetime.now(timezone.utc)
+            now_iso = now_dt.isoformat()
             failed_event = {"event": "failed", "error": str(exc), "ts": now_iso}
             db.add(
                 RunEvent(
@@ -136,7 +137,7 @@ def process_task(engine_lifecycle: EngineLifecycle, run_id: str, reclaimed: bool
                     seq=seq,
                     event="failed",
                     data=failed_event,
-                    ts=datetime.fromisoformat(now_iso),
+                    ts=now_dt,
                 )
             )
             run.status = "failed"

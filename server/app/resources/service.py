@@ -16,8 +16,16 @@ from app.run import service as run_service
 from app.run.models import Run
 from app.workspace.models import Workspace
 
-def _get_limit_by_workspace(db: Session, workspace: Workspace) -> int:
-    return billing_service.get_plan_limits(db, workspace.owner_id)["max_total_storage_bytes"]
+def _get_limits_by_workspace(db: Session, workspace: Workspace) -> dict:
+    return billing_service.get_plan_limits(db, workspace.owner_id)
+
+def _get_total_storage_used(db: Session, owner_id: uuid.UUID) -> int:
+    return (
+        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
+        .join(Workspace, Workspace.id == ResourceUsage.workspace_id)
+        .filter(Workspace.owner_id == owner_id, Workspace.deleted_at.is_(None))
+        .scalar()
+    )
 
 def presign_upload(
     db: Session,
@@ -29,16 +37,12 @@ def presign_upload(
     overwrite: bool,
     idempotency_key: str,
     content_length: int,
-) -> tuple[Run, dict]:
-    limits = _get_limit_by_workspace(db, workspace)
+) -> tuple[Run, dict, str]:
+    limits = _get_limits_by_workspace(db, workspace)
     if content_length > limits["max_resource_size_bytes"]:
         raise PayloadTooLargeError(f"File exceeds plan limit of {limits['max_resource_size_bytes']} bytes")
 
-    current_usage = (
-        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
-        .filter(ResourceUsage.workspace_id == workspace.id)
-        .scalar()
-    )
+    current_usage = _get_total_storage_used(db, workspace.owner_id)
     if current_usage + content_length > limits["max_total_storage_bytes"]:
         raise PayloadTooLargeError(f"Workspace storage limit of {limits['max_total_storage_bytes']} bytes exceeded")
 
@@ -61,17 +65,13 @@ def confirm_upload(db: Session, *, workspace: Workspace, run_id: uuid.UUID) -> R
     if not staging.exists(run.spec["staging_key"]):
         raise HTTPException(status_code=400, detail="Upload not found in staging")
 
-    limits = _get_limit_by_workspace(db, workspace)
+    limits = _get_limits_by_workspace(db, workspace)
     upload_size = staging.size(run.spec["staging_key"])
     if upload_size > limits["max_resource_size_bytes"]:
         staging.delete(run.spec["staging_key"])
         raise PayloadTooLargeError(f"File exceeds plan limit of {limits['max_resource_size_bytes']} bytes")
 
-    current_usage = (
-        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
-        .filter(ResourceUsage.workspace_id == workspace.id)
-        .scalar()
-    )
+    current_usage = _get_total_storage_used(db, workspace.owner_id)
     if current_usage + upload_size > limits["max_total_storage_bytes"]:
         staging.delete(run.spec["staging_key"])
         raise PayloadTooLargeError(f"Workspace storage limit of {limits['max_total_storage_bytes']} bytes exceeded")
@@ -95,11 +95,12 @@ def preview_resource(engine: Engine, bucket: str, key: str, limit: int, offset: 
         raise HTTPException(status_code=404, detail=result["error"])
     return result["data"]
 
-def delete_resource(db: Session, engine: Engine, bucket: str, key: str) -> None:
+def delete_resource(db: Session, engine: Engine, workspace_id: uuid.UUID, key: str) -> None:
+    bucket = str(workspace_id)
     result = drain_events(engine.data_resource.delete(key, bucket=bucket))
     if result["event"] == "failed":
         raise HTTPException(status_code=404, detail=result["error"])
-    db.query(ResourceUsage).filter(ResourceUsage.workspace_id == bucket, ResourceUsage.key == key).delete()
+    db.query(ResourceUsage).filter(ResourceUsage.workspace_id == workspace_id, ResourceUsage.key == key).delete()
     db.commit()
 
 def export_resource(db: Session, *, workspace: Workspace, key: str, format: str, idempotency_key: str) -> Run:

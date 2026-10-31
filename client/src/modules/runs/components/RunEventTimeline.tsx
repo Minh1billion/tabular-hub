@@ -142,12 +142,3 @@ export function RunEventTimeline({ events }: RunEventTimelineProps) {
     </div>
   )
 }
-
-export const RUN_BADGE_TONE: Record<string, 'success' | 'error' | 'pending'> = {
-  completed: 'success',
-  failed: 'error',
-  cancelled: 'error',
-  cancelling: 'pending',
-  running: 'pending',
-  queued: 'pending',
-}

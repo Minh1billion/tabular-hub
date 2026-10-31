@@ -25,7 +25,9 @@ export function ResourceInspector({ workspaceId, resourceKey, onClose }: Resourc
   const [collapsed, setCollapsed] = useState(false)
   const [box, setBox] = useState(() => {
     const width = Math.min(640, window.innerWidth - 32)
-    return { x: Math.max(16, window.innerWidth - 16 - width), y: 80, width, height: 480 }
+    const canvasRect = document.querySelector('.ed-canvas')?.getBoundingClientRect()
+    const rightEdge = canvasRect ? canvasRect.right : window.innerWidth
+    return { x: Math.max(16, rightEdge - 16 - width), y: 80, width, height: 480 }
   })
   const [isResizing, setIsResizing] = useState(false)
   const dragging = useRef(false)

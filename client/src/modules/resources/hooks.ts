@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { deleteResource, exportDownloadUrl, exportResource, importResource, listResources, previewResource } from './api'
 import { ExportResourcePayload, ImportResourcePayload } from './types'
+import { workspacesQueryKey } from '@/modules/workspace/hooks'
 
 export const resourcesQueryKey = (workspaceId: string) => ['workspaces', workspaceId, 'resources'] as const
 export const resourcePreviewQueryKey = (workspaceId: string, key: string, limit: number, offset: number) =>
@@ -54,6 +55,7 @@ export function useDeleteResource(workspaceId: string) {
     mutationFn: (key: string) => deleteResource(workspaceId, key),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: resourcesQueryKey(workspaceId) })
+      queryClient.invalidateQueries({ queryKey: workspacesQueryKey })
     },
   })
 }

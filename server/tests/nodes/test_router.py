@@ -6,7 +6,11 @@ def workspace(auth_client):
     return resp.json()
 
 @pytest.fixture
-def other_workspace(auth_client):
+def other_workspace(auth_client, db_session, test_user):
+    from app.billing.models import Subscription
+
+    db_session.add(Subscription(user_id=test_user.id, tier="pro", status="active"))
+    db_session.commit()
     resp = auth_client.post("/workspaces", json={"name": "Nodes WS 2"})
     return resp.json()
 

@@ -8,10 +8,8 @@ from app.auth.models import User
 from app.core.engine import get_engine
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.core.engine import get_engine
 from app.workspace import service
-from app.workspace.schemas import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
-from tabular_manner.engine.bootstrap import Engine
+from app.workspace.schemas import WorkspaceCreate, WorkspaceListItem, WorkspaceRead, WorkspaceUpdate
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -23,7 +21,7 @@ def create(
 ):
     return service.create_workspace(db, owner_id=current_user.id, name=payload.name)
 
-@router.get("", response_model=list[WorkspaceRead])
+@router.get("", response_model=list[WorkspaceListItem])
 def list_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -36,7 +34,7 @@ def get(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_workspace(db, owner_id=current_user.id, workspace_id=workspace_id)
+    return service.get_workspace(db, owner_id=current_user.id, workspace_id=workspace_id, touch=True)
 
 @router.patch("/{workspace_id}", response_model=WorkspaceRead)
 def update(

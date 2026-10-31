@@ -1,8 +1,8 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { CreateWorkspacePayload, UpdateWorkspacePayload, Workspace } from './types'
+import { CreateWorkspacePayload, UpdateWorkspacePayload, Workspace, WorkspaceListItem } from './types'
 
 export function listWorkspaces() {
-  return apiClient.get<Workspace[]>('/workspaces')
+  return apiClient.get<WorkspaceListItem[]>('/workspaces')
 }
 
 export function getWorkspace(workspaceId: string) {

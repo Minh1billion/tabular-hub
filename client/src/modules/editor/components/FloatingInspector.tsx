@@ -27,7 +27,9 @@ function initialPos(): Pos {
   } catch {
     localStorage.removeItem(STORAGE_KEY)
   }
-  return clampPos(window.innerWidth - WIDTH - 20, 76)
+  const canvasRect = document.querySelector('.ed-canvas')?.getBoundingClientRect()
+  const leftEdge = canvasRect ? canvasRect.left : 0
+  return clampPos(leftEdge + 20, 76)
 }
 
 interface FloatingInspectorProps {

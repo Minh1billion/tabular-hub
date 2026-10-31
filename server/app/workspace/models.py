@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import Column, DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import relationship
 
@@ -11,5 +13,11 @@ class Workspace(Base, UUIDPKMixin, TimestampMixin):
     owner_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
     spec = Column(JSON, nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
     owner = relationship("User", back_populates="workspaces")

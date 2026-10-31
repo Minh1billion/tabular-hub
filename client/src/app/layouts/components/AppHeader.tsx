@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '@/shared/components/ui/Avatar'
 import { cn } from '@/shared/lib/cn'
@@ -7,6 +7,7 @@ import { ArrowLeftIcon, BookIcon, ChevronIcon, GitHubIcon, HistoryIcon, LogoutIc
 import { useClickOutside } from '@/shared/hooks/useClickOutside'
 import { useCurrentUser, useLogout } from '@/modules/auth/hooks'
 import { useWorkspaces } from '@/modules/workspace/hooks'
+import { sortWorkspaces, touchWorkspace } from '@/modules/workspace/lib/activity'
 
 const ENGINE_REPO_URL = 'https://github.com/Minh1billion/tabular-manner'
 const HUB_REPO_URL = 'https://github.com/Minh1billion/tabular-hub'
@@ -28,6 +29,12 @@ export function AppHeader() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useClickOutside(ref, () => setOpen(false), open)
+
+  useEffect(() => {
+    if (activeId) touchWorkspace(activeId)
+  }, [activeId])
+
+  const recentWorkspaces = useMemo(() => sortWorkspaces(workspaces, 'recent'), [workspaces, activeId, open])
 
   const { data: user } = useCurrentUser()
   const logout = useLogout()
@@ -70,13 +77,14 @@ export function AppHeader() {
             </button>
             {open && (
               <div className="ws-list" role="listbox">
-                {workspaces.map((w) => (
+                {recentWorkspaces.map((w) => (
                   <button
                     key={w.id}
                     type="button"
                     role="option"
                     aria-selected={w.id === activeId}
                     onClick={() => {
+                      touchWorkspace(w.id)
                       navigate(`/workspaces/${w.id}`)
                       setOpen(false)
                     }}
@@ -103,7 +111,7 @@ export function AppHeader() {
           </Link>
           <Link to={`/workspaces/${activeId}/runs`} className={cn('btn btn-sm', inRuns ? 'btn-primary' : 'btn-outline')} aria-current={inRuns ? 'page' : undefined}>
             <HistoryIcon className="w-3.5 h-3.5" />
-            Runs
+            Run Histories
           </Link>
         </>
       ) : (
