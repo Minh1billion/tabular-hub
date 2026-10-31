@@ -2,23 +2,21 @@ import { useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
 import { Toggle } from '@/shared/components/ui/Toggle'
 import { Badge } from '@/shared/components/ui/Badge'
-import { Select } from '@/shared/components/ui/Select'
-import { TableIcon } from '@/shared/components/ui/icons'
 import { CategoryIcon } from '../category'
 import { NodeDescriptor } from '@/modules/editor/types'
-import { useResources } from '@/modules/resources/hooks'
-import { GraphNode } from '../../types'
+import { GraphNode, NodeSchema } from '../../types'
+import { MetaControl, ParamContext } from './ParamControls'
 
 interface NodeInspectorProps {
   workspaceId: string
   node: GraphNode
   descriptor?: NodeDescriptor
   category?: string
+  nodeSchema?: NodeSchema
+  schemaLoading?: boolean
   onChange: (params: Record<string, unknown>) => void
   onRename: (name: string) => void
 }
-
-const RESOURCE_KEY_DROPDOWN_NODE_TYPES = new Set(['fetch_internal'])
 
 function fieldValueToText(value: unknown, typeName: string): string {
   if (value === undefined) return ''
@@ -111,9 +109,16 @@ function ParamField({
   )
 }
 
-export function NodeInspector({ workspaceId, node, descriptor, category = 'Transform', onChange, onRename }: NodeInspectorProps) {
-  const usesResourceKeyDropdown = RESOURCE_KEY_DROPDOWN_NODE_TYPES.has(node.type)
-  const { data: resources, isLoading: isLoadingResources } = useResources(workspaceId)
+export function NodeInspector({
+  workspaceId,
+  node,
+  descriptor,
+  category = 'Transform',
+  nodeSchema,
+  schemaLoading = false,
+  onChange,
+  onRename,
+}: NodeInspectorProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEditingName, setIsEditingName] = useState(false)
@@ -137,23 +142,32 @@ export function NodeInspector({ workspaceId, node, descriptor, category = 'Trans
     if (!error) setParam(fieldName, textToFieldValue(text, typeName))
   }
 
+  const paramContext: ParamContext = {
+    workspaceId,
+    params: node.params,
+    schema: nodeSchema,
+    inPorts: descriptor?.in_ports ?? null,
+    loading: schemaLoading,
+  }
+
   function renderField(fieldName: string, typeName: string, required: boolean) {
     if (fieldName === 'bucket') return null
 
-    if (usesResourceKeyDropdown && fieldName === 'key') {
+    const meta = descriptor?.param_meta?.[fieldName]
+    if (meta) {
       return (
         <div key={fieldName} className="field">
           <label className="field-label">
             {fieldName}
             {required && <i>*</i>}
           </label>
-          <Select
-            value={typeof node.params[fieldName] === 'string' ? (node.params[fieldName] as string) : ''}
-            options={(resources?.keys ?? []).map((resourceKey) => ({ value: resourceKey, label: resourceKey, icon: <TableIcon /> }))}
+          <MetaControl
+            meta={meta}
+            typeName={typeName}
+            value={node.params[fieldName]}
             onChange={(value) => setParam(fieldName, value)}
-            placeholder="Select a resource"
-            emptyText="No datasets yet — import one from the Resources tab"
-            loading={isLoadingResources}
+            ctx={paramContext}
+            placeholder={required ? undefined : 'Default'}
           />
         </div>
       )
