@@ -33,6 +33,19 @@ class RunEventRead(BaseModel):
 class ValidateRequest(BaseModel):
     spec: dict[str, Any]
 
+class ColumnRead(BaseModel):
+    name: str
+    dtype: str
+    group: str
+
+class NodeSchemaRead(BaseModel):
+    inputs: dict[str, list[ColumnRead]] = {}
+    output: list[ColumnRead] | None = None
+
+class SchemaResponse(BaseModel):
+    nodes: dict[str, NodeSchemaRead] = {}
+    error: str | None = None
+
 class NodeErrorRead(BaseModel):
     node_id: str | None = None
     node_type: str | None = None

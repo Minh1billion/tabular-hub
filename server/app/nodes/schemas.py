@@ -1,9 +1,12 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 class NodeDescriptor(BaseModel):
     type: str
     required: dict[str, str]
     optional: dict[str, str]
+    param_meta: dict[str, dict[str, Any]] = {}
     ports_out: list[str]
     fan_in: bool
     in_ports: list[str] | None

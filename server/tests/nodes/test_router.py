@@ -25,6 +25,12 @@ def test_list_nodes_includes_builtin(auth_client, workspace):
     assert any(n["type"] == "select" for n in body["builtin"])
     assert body["custom"] == []
 
+def test_list_nodes_includes_param_meta(auth_client, workspace):
+    response = auth_client.get(f"/workspaces/{workspace['id']}/nodes")
+    builtin = {n["type"]: n for n in response.json()["builtin"]}
+    assert builtin["select"]["param_meta"]["columns"]["kind"] == "columns"
+    assert builtin["fetch_internal"]["param_meta"]["key"]["kind"] == "resource"
+
 def test_register_and_list_custom_node(auth_client, workspace):
     create = auth_client.post(
         f"/workspaces/{workspace['id']}/nodes",

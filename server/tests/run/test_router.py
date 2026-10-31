@@ -191,6 +191,59 @@ def test_validate_unknown_node_type(auth_client, workspace):
     assert response.status_code == 200
     assert response.json()["valid"] is False
 
+def test_schema_returns_input_columns_for_incomplete_node(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
+    spec = {
+        "nodes": [
+            {"id": "1", "type": "fetch_internal", "name": "Fetch", "params": {"key": "raw"}},
+            {"id": "2", "type": "select", "name": "Select", "params": {}},
+        ],
+        "connections": [{"from": "1", "to": "2"}],
+    }
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/schema", json={"spec": spec})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["error"] is None
+    assert body["nodes"]["1"]["output"] == [{"name": "a", "dtype": "Int64", "group": "numeric"}]
+    assert [c["name"] for c in body["nodes"]["2"]["inputs"]["in"]] == ["a"]
+    assert body["nodes"]["2"]["output"] is None
+
+def test_schema_propagates_downstream(auth_client, workspace):
+    _seed_raw_resource(workspace["id"])
+    spec = {
+        "nodes": [
+            {"id": "1", "type": "fetch_internal", "name": "Fetch", "params": {"key": "raw"}},
+            {"id": "2", "type": "rename", "name": "Rename", "params": {"mapping": {"a": "b"}}},
+            {"id": "3", "type": "sort", "name": "Sort", "params": {}},
+        ],
+        "connections": [{"from": "1", "to": "2"}, {"from": "2", "to": "3"}],
+    }
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/schema", json={"spec": spec})
+    assert [c["name"] for c in response.json()["nodes"]["3"]["inputs"]["in"]] == ["b"]
+
+def test_schema_empty_graph_returns_no_nodes(auth_client, workspace):
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/schema", json={"spec": {"nodes": [], "connections": []}})
+    assert response.status_code == 200
+    assert response.json() == {"nodes": {}, "error": None}
+
+def test_schema_cyclic_graph_returns_error(auth_client, workspace):
+    spec = {
+        "nodes": [
+            {"id": "1", "type": "sort", "name": "A", "params": {}},
+            {"id": "2", "type": "sort", "name": "B", "params": {}},
+        ],
+        "connections": [{"from": "1", "to": "2"}, {"from": "2", "to": "1"}],
+    }
+    response = auth_client.post(f"/workspaces/{workspace['id']}/runs/schema", json={"spec": spec})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["nodes"] == {}
+    assert "Cycle" in body["error"]
+
+def test_schema_requires_auth(client):
+    response = client.post("/workspaces/00000000-0000-0000-0000-000000000000/runs/schema", json={"spec": {}})
+    assert response.status_code == 401
+
 def test_cancel_queued_run(auth_client, workspace):
     created = auth_client.post(
         f"/workspaces/{workspace['id']}/runs",
