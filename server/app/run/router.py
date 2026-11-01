@@ -14,7 +14,7 @@ from app.database import get_db
 from app.dependencies import get_owned_workspace
 from app.run.spec import assert_web_supported_nodes, strip_bucket_params
 from app.run import service
-from app.run.schemas import RunCreate, RunEventRead, RunRead, ValidateRequest, ValidateResponse
+from app.run.schemas import RunCreate, RunEventRead, RunRead, SchemaResponse, ValidateRequest, ValidateResponse
 from app.workspace.models import Workspace
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/runs", tags=["runs"])
@@ -50,6 +50,21 @@ def validate(
             errors = [{"node_id": result.get("node_id"), "node_type": result.get("node_type"), "message": result["error"]}]
         return ValidateResponse(valid=False, errors=errors)
     return ValidateResponse(valid=True, errors=[])
+
+@router.post("/schema", response_model=SchemaResponse)
+def infer_schema(
+    payload: ValidateRequest,
+    workspace: Workspace = Depends(get_owned_workspace),
+    engine: Engine = Depends(get_engine),
+):
+    spec = strip_bucket_params(payload.spec)
+    assert_web_supported_nodes(spec, engine.registry_provider.get(str(workspace.id)))
+    result = None
+    for event in engine.execution.infer_schemas(spec, bucket=str(workspace.id)):
+        result = event
+    if result["event"] == "failed":
+        return SchemaResponse(error=result["error"])
+    return SchemaResponse(nodes=result["data"]["nodes"])
 
 @router.get("", response_model=list[RunRead])
 def list_(

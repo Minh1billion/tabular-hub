@@ -5,7 +5,7 @@ import { Button } from '@/shared/components/ui/Button'
 import { CheckIcon, HelpIcon } from '@/shared/components/ui/icons'
 import { cn } from '@/shared/lib/cn'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
-import { useNodeLibrary } from '@/modules/editor/nodes/hooks'
+import { useGraphSchema, useNodeLibrary } from '@/modules/editor/nodes/hooks'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
 import { ValidateResponse } from '@/modules/runs/types'
 import { RunPanel } from '@/modules/runs/components/RunPanel'
@@ -162,6 +162,7 @@ export function EditorPage() {
   }, [workspace])
 
   const debouncedSpec = useDebounce(spec, 500)
+  const { data: graphSchema, isLoading: schemaLoading } = useGraphSchema(workspaceId, debouncedSpec)
 
   useEffect(() => {
     if (!debouncedSpec) return
@@ -261,6 +262,8 @@ export function EditorPage() {
               node={selectedNode}
               descriptor={selectedMeta?.descriptor}
               category={selectedMeta?.category}
+              nodeSchema={graphSchema?.nodes[selectedNode.id]}
+              schemaLoading={schemaLoading}
               onChange={(params) => actionsRef.current?.updateParams(selectedNode.id, params)}
               onRename={(name) => actionsRef.current?.rename(selectedNode.id, name)}
             />
