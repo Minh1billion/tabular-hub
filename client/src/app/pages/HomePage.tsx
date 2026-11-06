@@ -1,10 +1,13 @@
 import { PropsWithChildren, ReactNode, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import logo from '@/assets/logo.svg'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
 import { NodeOverlay } from '@/shared/components/ui/NodeOverlay'
 import { Badge } from '@/shared/components/ui/Badge'
 import { GitHubIcon, StarIcon, ArrowRightIcon } from '@/shared/components/ui/icons'
+import { useCurrentUser } from '@/modules/auth/hooks'
+import { useLoginModal } from '@/modules/auth/components/LoginModal'
+import { consumeLoginIntent } from '@/modules/auth/login-intent'
 import { CategoryIcon } from '@/modules/editor/nodes/category'
 import { TechIcon } from './tech-icons'
 import { useReveal } from '@/shared/hooks/useReveal'
@@ -161,9 +164,67 @@ function Repo({ title, path, description, tags, href }: { title: string; path: s
 
 const FEATURE_ICON = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
 
+function EntryAction({ size, label }: { size: 'md' | 'lg'; label: string }) {
+  const { data: user } = useCurrentUser({ silent: true })
+  const { open } = useLoginModal()
+  const cls = `btn btn-primary btn-${size}`
+
+  if (user) {
+    return (
+      <Link to="/app" className={cls}>
+        Open editor
+        <ArrowRightIcon className="w-4 h-4" />
+      </Link>
+    )
+  }
+
+  return (
+    <button type="button" className={cls} onClick={open}>
+      {label}
+      <ArrowRightIcon className="w-4 h-4" />
+    </button>
+  )
+}
+
 export function HomePage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { data: user, isLoading } = useCurrentUser({ silent: true })
+  const { open } = useLoginModal()
+
+  useEffect(() => {
+    if (user && consumeLoginIntent()) navigate('/app', { replace: true })
+  }, [user, navigate])
+
+  useEffect(() => {
+    if (!isLoading && !user && (location.state as { login?: boolean } | null)?.login) {
+      open()
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [isLoading, user, location, open, navigate])
+
   return (
     <div className="hm">
+      <header className="hm-nav">
+        <div className="hm-nav-in">
+          <Link to="/" className="brand" aria-label="Tabular Hub home">
+            <img src={logo} alt="" />
+            <span>
+              Tabular<b>Hub</b>
+            </span>
+          </Link>
+          <nav>
+            <a href={DOCS_URL} target="_blank" rel="noreferrer">
+              Docs
+            </a>
+            <a href={HUB_REPO_URL} target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+          </nav>
+          <EntryAction size="md" label="Sign in" />
+        </div>
+      </header>
+
       <section className="hm-sec hm-hero">
         <GridPattern cellSize={28} className="hm-mask opacity-70" />
         <NodeOverlay className="opacity-60" />
@@ -183,10 +244,7 @@ export function HomePage() {
             </p>
 
             <div className="hm-cta">
-              <Link to="/workspaces" className="btn btn-primary btn-lg">
-                Go to your workspaces
-                <ArrowRightIcon className="w-4 h-4" />
-              </Link>
+              <EntryAction size="lg" label="Get started" />
               <a href={DOCS_URL} target="_blank" rel="noreferrer" className="btn btn-outline btn-lg">
                 Read the docs
               </a>
@@ -349,7 +407,7 @@ export function HomePage() {
             <a href={HUB_REPO_URL} target="_blank" rel="noreferrer">
               Web app
             </a>
-            <Link to="/workspaces">Workspaces</Link>
+            {user ? <Link to="/app">Open editor</Link> : <button type="button" onClick={open}>Sign in</button>}
           </nav>
         </div>
       </footer>

@@ -3,9 +3,9 @@
 @import './components.css';
 @import './motion.css';
 @import '../../app/layouts/styles.css';
+@import '../../modules/auth/auth.css';
 @import '../../modules/editor/editor.css';
 @import '../../modules/resources/resources.css';
-@import '../../modules/workspace/workspace.css';
 @import '../../modules/billing/billing.css';
 @import '../../modules/runs/runs.css';
 @import '../../app/pages/home.css';
@@ -19,7 +19,7 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--cream);
+  background: var(--bg);
   color: var(--ink);
   font: 14px/1.55 var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -40,11 +40,11 @@ h1, h2, h3 { font-family: var(--font-body); }
 .thin-scrollbar { scrollbar-width: thin; }
 
 .react-flow {
-  --xy-background-color: var(--cream);
+  --xy-background-color: var(--surface);
   --xy-background-pattern-color: var(--line-2);
   --xy-edge-stroke: var(--ink);
   --xy-edge-stroke-selected: var(--brand);
-  --xy-edge-stroke-width: 2;
+  --xy-edge-stroke-width: 1.75;
   --xy-connectionline-stroke: var(--brand);
   --xy-connectionline-stroke-width: 2;
   --xy-handle-background-color: var(--white);
@@ -54,11 +54,11 @@ h1, h2, h3 { font-family: var(--font-body); }
   --xy-minimap-node-background-color: var(--brand-tint-2);
   --xy-controls-button-background-color: var(--white);
   --xy-controls-button-background-color-hover: var(--brand-tint);
-  --xy-controls-button-border-color: var(--ink);
+  --xy-controls-button-border-color: var(--line);
   --xy-controls-button-color: var(--ink);
   --xy-controls-button-color-hover: var(--ink);
 }
-.react-flow__controls { border: var(--edge); border-radius: var(--r-s); box-shadow: var(--shadow-1); overflow: hidden; }
-.react-flow__controls-button { border-bottom: 1px solid var(--line-2); }
-.react-flow__minimap { border: var(--edge); border-radius: var(--r-s); box-shadow: var(--shadow-1); overflow: hidden; }
+.react-flow__controls { border: var(--edge-thin); border-radius: var(--r-s); box-shadow: none; overflow: hidden; background: var(--white); }
+.react-flow__controls-button { border-bottom: 1px solid var(--line); }
+.react-flow__minimap { border: var(--edge-thin); border-radius: var(--r-s); box-shadow: none; overflow: hidden; }
 .react-flow__attribution { display: none; }

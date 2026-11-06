@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Input } from '@/shared/components/ui/Input'
 import { Toggle } from '@/shared/components/ui/Toggle'
 import { Badge } from '@/shared/components/ui/Badge'
-import { CategoryIcon } from '../category'
+import { NodeIcon } from '../icons'
 import { NodeDescriptor } from '@/modules/editor/types'
 import { GraphNode, NodeSchema } from '../../types'
 import { MetaControl, ParamContext } from './ParamControls'
@@ -196,8 +196,8 @@ export function NodeInspector({
   return (
     <div data-cat={category}>
       <div className="insp-head">
-        <span className="cat-tile">
-          <CategoryIcon category={category} />
+        <span className="cat-tile nt">
+          <NodeIcon type={node.type} category={category} />
         </span>
         {isEditingName ? (
           <input

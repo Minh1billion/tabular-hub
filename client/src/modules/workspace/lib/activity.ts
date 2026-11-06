@@ -20,7 +20,6 @@ export function touchWorkspace(workspaceId: string): void {
     map[workspaceId] = Date.now()
     localStorage.setItem(ACCESSED_STORAGE_KEY, JSON.stringify(map))
   } catch {
-    // Storage unavailable (private mode)
   }
 }
 
@@ -29,7 +28,6 @@ export function lastAccessedAt(workspaceId: string): number {
   return map[workspaceId] ?? 0
 }
 
-/** Most recent moment the user touched the workspace: an access, an edit/save, or a pipeline run. */
 export function lastActivityAt(workspace: WorkspaceListItem): number {
   const edited = new Date(workspace.updated_at ?? workspace.created_at).getTime()
   const ran = workspace.last_run ? new Date(workspace.last_run.created_at).getTime() : 0
@@ -62,7 +60,6 @@ const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', Infinity],
 ]
 
-/** "just now", "5 minutes ago", "yesterday", "3 weeks ago"… */
 export function formatRelative(value: string | number, now = Date.now()): string {
   let delta = (new Date(value).getTime() - now) / 1000
   if (Math.abs(delta) < 45) return 'just now'
