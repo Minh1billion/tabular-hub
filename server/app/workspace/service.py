@@ -49,7 +49,6 @@ def list_workspaces(db: Session, *, owner_id: uuid.UUID) -> list[WorkspaceListIt
         .all()
     )
 
-    # Latest pipeline run per workspace (import/export runs are dataset operations, not pipeline activity).
     latest_run_at = (
         db.query(Run.workspace_id.label("workspace_id"), func.max(Run.created_at).label("created_at"))
         .filter(Run.workspace_id.in_(workspace_ids), Run.kind == "pipeline")

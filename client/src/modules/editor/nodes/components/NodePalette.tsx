@@ -10,6 +10,7 @@ import { cn } from '@/shared/lib/cn'
 import { CATEGORY_ORDER, CategoryIcon, NodeCategory, categoryOf } from '../category'
 import { RegisterNodeDialog } from './RegisterNodeDialog'
 import { usePaletteDrag } from '../lib/usePaletteDrag'
+import { NodeIcon } from '../icons'
 
 function groupByCategory(descriptors: NodeDescriptor[]) {
   const groups = new Map<NodeCategory, NodeDescriptor[]>()
@@ -39,8 +40,8 @@ function NodeItem({ descriptor, category, onDelete }: NodeItemProps) {
       className={cn('pal-item', drag && 'dragging')}
       data-cat={category}
     >
-      <span className="cat-tile">
-        <CategoryIcon category={category} />
+      <span className="cat-tile nt">
+        <NodeIcon type={descriptor.type} category={category} />
       </span>
       <div className="grow">
         <b>{descriptor.type}</b>

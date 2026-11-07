@@ -57,7 +57,7 @@ export function ExportResourceDialog({ workspaceId, resourceKey, onClose }: Expo
     <Modal title="Export dataset" onClose={onClose}>
       <form onSubmit={handleSubmit}>
         <div className="dlg-status" style={{ background: 'var(--white)' }}>
-          <span className="cat-tile" data-cat="IO" style={{ width: 28, height: 28, border: 'var(--edge)', borderRadius: 7 }}>
+          <span className="cat-tile" data-cat="IO" style={{ width: 28, height: 28, border: 'var(--edge-thin)', borderRadius: 7 }}>
             <TableIcon className="w-3.5 h-3.5" />
           </span>
           <span className="grow font-mono font-semibold">{resourceKey}</span>

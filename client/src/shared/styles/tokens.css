@@ -1,9 +1,10 @@
 :root {
-  --cream: #f5f5ef;
-  --cream-soft: #efefe6;
+  --bg: #ffffff;
+  --surface: #f6f8f7;
+  --surface-2: #edf1ef;
   --white: #ffffff;
-  --line: #e2e5e0;
-  --line-2: #c7ccc4;
+  --line: #e3e8e5;
+  --line-2: #c9d1cd;
   --ink: #16231c;
   --slate: #4b534c;
   --muted: #8b9089;
@@ -26,11 +27,12 @@
 
   --edge: 2px solid var(--ink);
   --edge-soft: 1px solid var(--line);
-  --shadow-btn: 0 3px 0 var(--ink);
-  --shadow-1: 3px 3px 0 var(--ink);
-  --shadow-2: 5px 5px 0 var(--ink);
-  --shadow-pop: 6px 6px 0 var(--ink);
-  --ring: 3px 3px 0 var(--brand);
+  --edge-thin: 1px solid var(--line-2);
+  --shadow-btn: 0 2px 0 var(--ink);
+  --shadow-1: 2px 2px 0 var(--ink);
+  --shadow-2: 4px 4px 0 var(--ink);
+  --shadow-pop: 4px 4px 0 var(--ink);
+  --ring: 2px 2px 0 var(--brand);
 
   --bar-h: 52px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

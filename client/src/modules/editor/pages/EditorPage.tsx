@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { Button } from '@/shared/components/ui/Button'
 import { CheckIcon, HelpIcon } from '@/shared/components/ui/icons'
@@ -9,6 +9,8 @@ import { useGraphSchema, useNodeLibrary } from '@/modules/editor/nodes/hooks'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
 import { ValidateResponse } from '@/modules/runs/types'
 import { RunPanel } from '@/modules/runs/components/RunPanel'
+import { RunHistoryPanel } from '@/modules/runs/components/RunHistoryPanel'
+import { TopbarPortal } from '@/app/layouts/TopbarSlot'
 import { GraphSpec } from '../types'
 import { Canvas, CanvasActions } from '../components/Canvas'
 import { BottomPanel, BottomPanelTab } from '../components/BottomPanel'
@@ -75,7 +77,7 @@ function ErrorsTab({
 export function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const workspaceId = id ?? ''
-  const { data: workspace, isLoading } = useWorkspace(workspaceId)
+  const { data: workspace, isLoading, isError: workspaceFailed } = useWorkspace(workspaceId)
   const updateWorkspace = useUpdateWorkspace(workspaceId)
   const { data: nodeLibrary } = useNodeLibrary(workspaceId)
 
@@ -182,6 +184,20 @@ export function EditorPage() {
     return map
   }, [nodeLibrary])
 
+  if (workspaceFailed) {
+    return (
+      <div className="ed-empty">
+        <div className="panel rise">
+          <h1 className="m-0 mb-2 text-[20px] font-bold tracking-tight">Workspace not found</h1>
+          <p className="m-0 mb-5 text-[13.5px] text-slate">It may have been deleted, or you don't have access to it.</p>
+          <Link to="/app" className="btn btn-primary btn-md">
+            Open another workspace
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading || !spec) {
     return (
       <div className="h-full grid place-items-center">
@@ -219,14 +235,17 @@ export function EditorPage() {
         <p className="dock-empty">No run yet. Press Run to execute the pipeline.</p>
       ),
     },
+    {
+      id: 'history',
+      label: 'History',
+      content: panelOpen && tabId === 'history' ? <RunHistoryPanel key={workspaceId} workspaceId={workspaceId} /> : null,
+    },
   ]
 
   return (
     <div className="ed">
-      <div className="ed-bar">
-        <h2>{workspace?.name}</h2>
-        <div className="spacer" />
-        <IconButton size="sm" className="help-btn" tip="Keyboard shortcuts" onClick={() => setShowShortcuts(true)}>
+      <TopbarPortal>
+        <IconButton size="sm" className="help-btn" tip="Keyboard shortcuts" tipSide="bottom" onClick={() => setShowShortcuts(true)}>
           <HelpIcon className="w-4 h-4" />
         </IconButton>
         <span className={cn('save-state', saving && 'busy')}>
@@ -239,9 +258,10 @@ export function EditorPage() {
           </svg>
           Run
         </Button>
-      </div>
+      </TopbarPortal>
 
       <div className="ed-main">
+        <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         <Canvas
           spec={spec}
           onSpecChange={setSpec}
@@ -253,7 +273,6 @@ export function EditorPage() {
           onSelectedNodeIdChange={setSelectedNodeId}
           actionsRef={actionsRef}
         />
-        <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         {selectedNode && (
           <FloatingInspector onClose={() => actionsRef.current?.deselect()}>
             <NodeInspector

@@ -87,7 +87,7 @@ export function BottomPanel({ tabs, open, onOpenChange, activeTabId, onActiveTab
       <div className={cn('dock-body', !resizing && 'animate', !open && 'closed')} style={{ height: open ? height : 0 }} aria-hidden={!open}>
         <div className="dock-scroll">
           {tabs.map((tab) => (
-            <div key={tab.id} className={tab.id === activeTabId ? 'min-h-full' : 'hidden'}>
+            <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
               {tab.content}
             </div>
           ))}

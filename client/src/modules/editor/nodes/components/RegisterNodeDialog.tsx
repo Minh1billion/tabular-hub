@@ -33,8 +33,8 @@ export function RegisterNodeDialog({ workspaceId, onClose }: RegisterNodeDialogP
 
         <div className="field">
           <label className="field-label">Expression</label>
-          <div style={{ border: "var(--edge)", borderRadius: "var(--r-s)", overflow: "hidden", background: "var(--cream)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderBottom: "var(--edge)", background: "var(--cream-soft)" }}>
+          <div style={{ border: "var(--edge-thin)", borderRadius: "var(--r-s)", overflow: "hidden", background: "var(--surface)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderBottom: "var(--edge-soft)", background: "var(--surface-2)" }}>
               <span className="w-2 h-2 rounded-full bg-warn" />
               <span className="w-2 h-2 rounded-full bg-accent-gold" />
               <span className="w-2 h-2 rounded-full bg-brand" />

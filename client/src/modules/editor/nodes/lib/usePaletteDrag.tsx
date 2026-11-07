@@ -1,9 +1,11 @@
 import { CSSProperties, PointerEvent as ReactPointerEvent, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/shared/lib/cn'
-import { CategoryIcon } from '../category'
+import { NodeIcon } from '../icons'
 
 export const NODE_DROP_EVENT = 'palette-node-drop'
+export const NODE_WIDTH = 110
+export const NODE_TILE = 56
 
 export interface PaletteDrop {
   nodeType: string
@@ -28,13 +30,9 @@ interface Options {
   onStart?: () => void
 }
 
-function ghostWidth(label: string) {
-  return Math.min(232, Math.max(156, 65 + label.length * 7.5))
-}
-
 export function usePaletteDrag({ nodeType, label, category, params, onStart }: Options) {
   const [drag, setDrag] = useState<DragState | null>(null)
-  const width = ghostWidth(label)
+  const width = NODE_WIDTH
 
   function onPointerDown(event: ReactPointerEvent) {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return
@@ -79,11 +77,8 @@ export function usePaletteDrag({ nodeType, label, category, params, onStart }: O
 
   const ghost = drag
     ? createPortal(
-        <div className={cn('pn-ghost', drag.over && 'over')} data-cat={category} style={{ left: drag.x, top: drag.y, '--w': `${width}px` } as CSSProperties}>
-          <span className="pn-icon cat-tile">
-            <CategoryIcon category={category} />
-          </span>
-          <span className="pn-ghost-title">{label}</span>
+        <div className={cn('nx-ghost', drag.over && 'over')} data-cat={category} style={{ left: drag.x, top: drag.y } as CSSProperties}>
+          <NodeIcon type={nodeType} category={category} className="nx-icon" />
         </div>,
         document.body,
       )
