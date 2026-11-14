@@ -1,12 +1,17 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, status
+from fastapi.concurrency import run_in_threadpool
+from redis.exceptions import RedisError
 from sqlalchemy.orm import Session
 from tabular_manner.engine.bootstrap import Engine
 
 from app.auth.models import User
+from app.collab import store as collab_store
+from app.collab.hub import hub
 from app.core.engine import get_engine
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import ForbiddenError, ServiceUnavailableError
 from app.database import get_db
 from app.dependencies import WorkspaceAccess, get_current_user, get_owner_workspace, get_workspace_access
 from app.workspace import service
@@ -20,6 +25,8 @@ from app.workspace.schemas import (
     WorkspaceRead,
     WorkspaceUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -49,15 +56,46 @@ def get(
     return service.to_read(workspace, access.role)
 
 @router.patch("/{workspace_id}", response_model=WorkspaceRead)
-def update(
+async def update(
     payload: WorkspaceUpdate,
     access: WorkspaceAccess = Depends(get_workspace_access),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if payload.name is not None and not access.is_owner:
         raise ForbiddenError("Only the workspace owner can rename this workspace")
-    workspace = service.update_workspace(db, workspace=access.workspace, name=payload.name, spec=payload.spec)
-    return service.to_read(workspace, access.role)
+
+    workspace_id = access.workspace.id
+    actor_id = current_user.id
+    locks: dict[tuple[str, str], str] = {}
+    if payload.spec is not None:
+        try:
+            locks = await collab_store.locks_by_element(workspace_id)
+        except RedisError as exc:
+            raise ServiceUnavailableError("Collaboration service unavailable, try again shortly") from exc
+
+    def save():
+        workspace = service.update_workspace(
+            db,
+            workspace=access.workspace,
+            name=payload.name,
+            spec=payload.spec,
+            base_version=payload.base_version,
+            locks=locks,
+            actor_id=actor_id,
+        )
+        return service.to_read(workspace, access.role)
+
+    result = await run_in_threadpool(save)
+
+    if payload.spec is not None:
+        try:
+            await hub.publish_spec_updated(
+                workspace_id, version=result.spec_version, spec=result.spec, actor_id=str(actor_id)
+            )
+        except RedisError:
+            logger.exception("Failed to publish spec update for workspace %s", workspace_id)
+    return result
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete(
@@ -84,12 +122,17 @@ def invite_member(
     return service.invite_member(db, workspace=workspace, inviter=current_user, email=payload.email)
 
 @router.delete("/{workspace_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_member(
+async def remove_member(
     user_id: uuid.UUID,
     workspace: Workspace = Depends(get_owner_workspace),
     db: Session = Depends(get_db),
 ):
-    service.remove_member(db, workspace=workspace, user_id=user_id)
+    workspace_id = workspace.id
+    await run_in_threadpool(service.remove_member, db, workspace=workspace, user_id=user_id)
+    try:
+        await hub.evict_member(workspace_id, user_id)
+    except RedisError:
+        logger.exception("Failed to evict member %s from workspace %s", user_id, workspace_id)
 
 @router.delete("/{workspace_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def revoke_invitation(

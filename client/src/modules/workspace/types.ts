@@ -8,6 +8,7 @@ export interface Workspace {
   owner_id: string
   role: WorkspaceRole
   spec: GraphSpec | null
+  spec_version: number
   created_at: string
   updated_at: string
 }
@@ -38,6 +39,7 @@ export interface CreateWorkspacePayload {
 export interface UpdateWorkspacePayload {
   name?: string
   spec?: GraphSpec
+  base_version?: number
 }
 
 export interface WorkspaceMember {

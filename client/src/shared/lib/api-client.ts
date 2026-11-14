@@ -2,10 +2,16 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
   status: number
+  data: Record<string, unknown> | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, data: Record<string, unknown> | null = null) {
     super(message)
     this.status = status
+    this.data = data
+  }
+
+  get code(): string | null {
+    return typeof this.data?.code === 'string' ? this.data.code : null
   }
 }
 
@@ -29,7 +35,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new ApiError(response.status, data?.detail ?? 'Something went wrong')
+    throw new ApiError(response.status, data?.detail ?? 'Something went wrong', data)
   }
 
   return data as T
@@ -40,6 +46,10 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+}
+
+export function wsUrl(path: string) {
+  return `${API_URL.replace(/^http/, 'ws')}${path}`
 }
 
 export function oauthLoginUrl(provider: 'google' | 'github') {

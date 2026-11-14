@@ -11,7 +11,14 @@ from app.auth.models import User
 from app.billing import service as billing_service
 from app.config import settings
 from app.core.engine import drain_events
-from app.core.exceptions import AppError, ConflictError, NotFoundError, PlanLimitExceededError
+from app.core.exceptions import (
+    AppError,
+    ConflictError,
+    ElementLockedError,
+    NotFoundError,
+    PlanLimitExceededError,
+    SpecConflictError,
+)
 from app.mail import service as mail_service
 from app.resources.models import ResourceUsage
 from app.run.models import Run
@@ -25,6 +32,7 @@ from app.workspace.models import (
     WorkspaceInvitation,
     WorkspaceMember,
 )
+from app.workspace import spec as spec_utils
 from app.workspace.schemas import (
     InvitationRead,
     InviteResult,
@@ -123,14 +131,71 @@ def touch_workspace(db: Session, workspace: Workspace) -> Workspace:
     db.refresh(workspace)
     return workspace
 
+def _spec_conflict(workspace: Workspace) -> SpecConflictError:
+    return SpecConflictError(
+        "The workspace was changed by someone else. Reload to get the latest version.",
+        version=workspace.spec_version,
+        spec=workspace.spec,
+    )
+
+def _assert_no_foreign_locks(
+    workspace: Workspace,
+    spec: dict[str, Any],
+    locks: dict[tuple[str, str], str],
+    actor_id: uuid.UUID,
+) -> None:
+    actor = str(actor_id)
+    touched = spec_utils.touched_elements(workspace.spec, spec)
+    blocked = sorted(
+        (kind, element_id, locks[(kind, element_id)])
+        for kind, element_id in touched
+        if (kind, element_id) in locks and locks[(kind, element_id)] != actor
+    )
+    if blocked:
+        raise ElementLockedError(
+            "Some elements are being edited by other people",
+            elements=[{"kind": kind, "id": element_id, "user_id": user_id} for kind, element_id, user_id in blocked],
+        )
+
 def update_workspace(
-    db: Session, *, workspace: Workspace, name: str | None, spec: dict[str, Any] | None
+    db: Session,
+    *,
+    workspace: Workspace,
+    name: str | None,
+    spec: dict[str, Any] | None,
+    base_version: int | None,
+    locks: dict[tuple[str, str], str],
+    actor_id: uuid.UUID,
 ) -> Workspace:
+    values: dict[str, Any] = {"updated_at": _utcnow()}
     if name is not None:
-        workspace.name = name
-    if spec is not None:
-        workspace.spec = spec
-    workspace.updated_at = _utcnow()
+        values["name"] = name
+
+    if spec is None:
+        db.query(Workspace).filter(Workspace.id == workspace.id).update(values, synchronize_session=False)
+        db.commit()
+        db.refresh(workspace)
+        return workspace
+
+    if base_version is None:
+        raise AppError("base_version is required when updating the spec")
+    spec_utils.validate_structure(spec)
+    db.refresh(workspace)
+    if workspace.spec_version != base_version:
+        raise _spec_conflict(workspace)
+    _assert_no_foreign_locks(workspace, spec, locks, actor_id)
+
+    values["spec"] = spec
+    values["spec_version"] = base_version + 1
+    updated = (
+        db.query(Workspace)
+        .filter(Workspace.id == workspace.id, Workspace.spec_version == base_version)
+        .update(values, synchronize_session=False)
+    )
+    if updated == 0:
+        db.rollback()
+        db.refresh(workspace)
+        raise _spec_conflict(workspace)
     db.commit()
     db.refresh(workspace)
     return workspace

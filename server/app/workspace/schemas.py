@@ -10,6 +10,7 @@ class WorkspaceCreate(BaseModel):
 class WorkspaceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     spec: dict[str, Any] | None = None
+    base_version: int | None = Field(default=None, ge=0)
 
 class WorkspaceOwner(BaseModel):
     model_config = {"from_attributes": True}
@@ -26,6 +27,7 @@ class WorkspaceRead(BaseModel):
     owner_id: uuid.UUID
     role: str = "owner"
     spec: dict[str, Any] | None
+    spec_version: int = 0
     created_at: datetime
     updated_at: datetime
 

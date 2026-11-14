@@ -261,3 +261,20 @@ body.pal-dragging, body.pal-dragging * { cursor: grabbing !important; user-selec
 .ntip-warn p { margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .ntip-warn p + p { margin-top: 6px; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--warn) 25%, var(--white)); }
 .ntip-warn small { display: block; margin-top: 6px; font-size: 11px; opacity: 0.75; }
+
+.presence { display: inline-flex; align-items: center; gap: 8px; }
+.presence-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); }
+.presence.offline .presence-dot { background: var(--muted); }
+.presence.offline .presence-list { opacity: 0.55; }
+.presence-list { display: flex; align-items: center; margin: 0; padding: 0; list-style: none; }
+.presence-item { display: grid; place-items: center; margin-left: -6px; padding: 2px; background: var(--user, var(--brand)); border-radius: 50%; box-shadow: 0 0 0 2px var(--white); }
+.presence-item:first-child { margin-left: 0; }
+.presence-item .avatar { display: block; border-radius: 50%; }
+.presence-more { margin-left: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--slate); }
+
+.nx.locked .nx-tile { cursor: not-allowed; border-color: var(--lock); box-shadow: 0 4px 0 var(--lock), 0 0 0 4px color-mix(in srgb, var(--lock) 22%, transparent); }
+.nx.locked:hover .nx-tile, .nx.locked:active .nx-tile { transform: none; box-shadow: 0 4px 0 var(--lock), 0 0 0 4px color-mix(in srgb, var(--lock) 22%, transparent); }
+.nx-lock { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; display: flex; align-items: center; gap: 5px; max-width: 150px; padding: 2px 8px 2px 3px; font-size: 11px; font-weight: 600; color: var(--white); white-space: nowrap; background: var(--lock); border-radius: 999px; transform: translateX(-50%); pointer-events: none; }
+.nx-lock .avatar { flex: none; border-radius: 50%; }
+.nx-lock span { overflow: hidden; text-overflow: ellipsis; }
+.react-flow__edge.edge-locked { cursor: not-allowed; pointer-events: none; }

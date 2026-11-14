@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, JSON, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -19,6 +19,7 @@ class Workspace(Base, UUIDPKMixin, TimestampMixin):
     name = Column(String, nullable=False)
     owner_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
     spec = Column(JSON, nullable=True)
+    spec_version = Column(Integer, nullable=False, default=0, server_default="0")
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(
         DateTime(timezone=True),

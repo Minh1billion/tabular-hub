@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     RUN_QUEUE_STREAM: str = "runs:pending"
 
+    COLLAB_PRESENCE_TTL_SECONDS: int = 30
+    COLLAB_HEARTBEAT_SECONDS: int = 10
+    COLLAB_LOCK_TTL_SECONDS: int = 30
+    COLLAB_SYNC_INTERVAL_SECONDS: float = 5.0
+    COLLAB_ACCESS_RECHECK_SECONDS: float = 15.0
+    COLLAB_MAX_LOCKS_PER_CONNECTION: int = 200
+
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     STRIPE_PUBLISHABLE_KEY: str
@@ -66,3 +73,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+def allowed_origins() -> list[str]:
+    return list({
+        settings.FRONTEND_URL,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    })

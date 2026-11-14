@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useDebounce } from '@/shared/hooks/useDebounce'
 import { ApiError } from '@/shared/lib/api-client'
 import { Badge } from '@/shared/components/ui/Badge'
 import { Button } from '@/shared/components/ui/Button'
 import { CheckIcon, HelpIcon, ShareIcon } from '@/shared/components/ui/icons'
 import { cn } from '@/shared/lib/cn'
-import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
+import { useUpdateWorkspace, useWorkspace, workspaceQueryKey } from '@/modules/workspace/hooks'
+import { getWorkspace } from '@/modules/workspace/api'
+import { useCollab } from '@/modules/collab/hooks'
+import { PresenceBar } from '@/modules/collab/components/PresenceBar'
+import { userColor, userLabel } from '@/modules/collab/lib/colors'
+import { mergeSpecs, specsEqual } from '@/modules/collab/lib/merge'
+import { LockHolder, LockKind, LockTarget, lockKey } from '@/modules/collab/types'
 import { ShareDialog } from '@/modules/workspace/components/ShareDialog'
 import { useGraphSchema, useNodeLibrary } from '@/modules/editor/nodes/hooks'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
@@ -28,8 +35,20 @@ import { NodeInspector } from '../nodes/components/NodeInspector'
 import { categoryOf } from '../nodes/category'
 import { shortErrorMessage } from '../lib/errors'
 
+const MAX_SAVE_FAILURES = 5
+const NOTICE_MS = 4000
+
 function emptySpec(name: string): GraphSpec {
   return { name, nodes: [], connections: [] }
+}
+
+function normalizeSpec(spec: GraphSpec): GraphSpec {
+  return { name: spec.name, nodes: spec.nodes ?? [], connections: spec.connections ?? [] }
+}
+
+interface LockedElement {
+  kind: LockKind
+  id: string
 }
 
 function ErrorsTab({
@@ -84,10 +103,18 @@ export function EditorPage() {
   const updateWorkspace = useUpdateWorkspace(workspaceId)
   const { data: nodeLibrary } = useNodeLibrary(workspaceId)
 
+  const queryClient = useQueryClient()
   const [spec, setSpec] = useState<GraphSpec | null>(null)
   const hydratedForRef = useRef<string | null>(null)
-  const skipNextSaveRef = useRef(true)
   const actionsRef = useRef<CanvasActions | null>(null)
+  const latestSpecRef = useRef<GraphSpec | null>(null)
+  const baseRef = useRef<{ spec: GraphSpec; version: number } | null>(null)
+  const savingRef = useRef(false)
+  const failuresRef = useRef(0)
+  const lastValidatedRef = useRef<string | null>(null)
+  const [saveTick, setSaveTick] = useState(0)
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const validateSpec = useValidateSpec(workspaceId)
   const [validation, setValidation] = useState<ValidateResponse | null>(null)
@@ -154,32 +181,150 @@ export function EditorPage() {
     ...bind('panel', () => setPanelOpen((open) => !open)),
   ])
 
+  function showNotice(message: string) {
+    setNotice(message)
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current)
+    noticeTimerRef.current = setTimeout(() => setNotice(null), NOTICE_MS)
+  }
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current)
+  }, [])
+
+  function integrateRemote(remoteSpec: GraphSpec, remoteVersion: number, remoteWins?: Set<string>) {
+    const base = baseRef.current
+    const local = latestSpecRef.current
+    if (!base || !local) return
+    const remote = normalizeSpec(remoteSpec)
+    const merged = mergeSpecs(base.spec, local, remote, remoteWins)
+    baseRef.current = { spec: remote, version: Math.max(remoteVersion, base.version) }
+    if (specsEqual(merged, local)) return
+    latestSpecRef.current = merged
+    actionsRef.current?.applyRemote(merged, base.spec, remote)
+    if (!specsEqual(merged, remote)) setSaveTick((tick) => tick + 1)
+  }
+
+  const handleRemoteSpec = useCallback((version: number, remoteSpec: unknown) => {
+    const base = baseRef.current
+    if (!base || version <= base.version || !remoteSpec) return
+    integrateRemote(remoteSpec as GraphSpec, version)
+  }, [])
+
+  const handleLockDenied = useCallback((target: LockTarget) => {
+    actionsRef.current?.deselectElements([target])
+    showNotice('That element is being edited by someone else')
+  }, [])
+
+  const collab = useCollab({
+    workspaceId,
+    enabled: Boolean(workspace),
+    onSpecUpdated: handleRemoteSpec,
+    onHello: (specVersion) => {
+      if (baseRef.current && specVersion > baseRef.current.version) {
+        queryClient.invalidateQueries({ queryKey: workspaceQueryKey(workspaceId) })
+      }
+    },
+    onAccessLost: () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey(workspaceId) }),
+    onLockDenied: handleLockDenied,
+  })
+
+  async function flushSave() {
+    const base = baseRef.current
+    const target = latestSpecRef.current
+    if (!base || !target || savingRef.current) return
+    if (specsEqual(target, base.spec)) return
+
+    savingRef.current = true
+    try {
+      const saved = await updateWorkspace.mutateAsync({ spec: target, base_version: base.version })
+      failuresRef.current = 0
+      const current = baseRef.current
+      if (current && saved.spec_version > current.version && saved.spec) {
+        baseRef.current = { spec: normalizeSpec(saved.spec), version: saved.spec_version }
+      }
+    } catch (error) {
+      failuresRef.current += 1
+      const retry = failuresRef.current < MAX_SAVE_FAILURES
+      if (error instanceof ApiError && error.code === 'spec_version_conflict' && error.data?.spec) {
+        integrateRemote(error.data.spec as GraphSpec, Number(error.data.version))
+        if (retry) setSaveTick((tick) => tick + 1)
+      } else if (error instanceof ApiError && error.code === 'element_locked') {
+        const blocked = (error.data?.elements as LockedElement[] | undefined) ?? []
+        try {
+          const fresh = await getWorkspace(workspaceId)
+          if (fresh.spec) {
+            integrateRemote(fresh.spec, fresh.spec_version, new Set(blocked.map((item) => lockKey(item.kind, item.id))))
+          }
+          showNotice('Some changes were reverted because others are editing those elements')
+          if (retry) setSaveTick((tick) => tick + 1)
+        } catch {
+          return
+        }
+      }
+    } finally {
+      savingRef.current = false
+    }
+  }
+
   useEffect(() => {
-    if (workspace && hydratedForRef.current !== workspace.id) {
-      const initial = workspace.spec ?? emptySpec(workspace.name)
+    if (!workspace) return
+    if (hydratedForRef.current !== workspace.id) {
+      const initial = normalizeSpec(workspace.spec ?? emptySpec(workspace.name))
       setSpec(initial)
+      latestSpecRef.current = initial
+      baseRef.current = { spec: initial, version: workspace.spec_version }
       hydratedForRef.current = workspace.id
-      skipNextSaveRef.current = true
       validationSeqRef.current += 1
       setValidation(null)
+      lastValidatedRef.current = JSON.stringify(initial)
       if (initial.nodes.length > 0) validate(initial).catch(() => undefined)
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (baseRef.current && workspace.spec && workspace.spec_version > baseRef.current.version) {
+      integrateRemote(workspace.spec, workspace.spec_version)
+    }
   }, [workspace])
 
   const debouncedSpec = useDebounce(spec, 500)
   const { data: graphSchema, isLoading: schemaLoading } = useGraphSchema(workspaceId, debouncedSpec)
 
   useEffect(() => {
+    if (!debouncedSpec && saveTick === 0) return
+    flushSave()
+  }, [debouncedSpec, saveTick])
+
+  useEffect(() => {
     if (!debouncedSpec) return
-    if (skipNextSaveRef.current) {
-      skipNextSaveRef.current = false
-      return
-    }
-    updateWorkspace.mutate({ spec: debouncedSpec })
+    const serialized = JSON.stringify(debouncedSpec)
+    if (serialized === lastValidatedRef.current) return
+    lastValidatedRef.current = serialized
     validate(debouncedSpec).catch(() => undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSpec])
+
+  const handleSpecChange = useCallback(
+    (next: GraphSpec) => {
+      latestSpecRef.current = next
+      setSpec(next)
+      collab.touch()
+    },
+    [collab.touch],
+  )
+
+  const lockHolders = useMemo(() => {
+    const byId = new Map(collab.users.map((user) => [user.id, user]))
+    const result: Record<string, LockHolder> = {}
+    for (const lock of collab.locks) {
+      if (lock.conn_id === collab.connId) continue
+      const user = byId.get(lock.user_id)
+      result[lockKey(lock.kind, lock.id)] = {
+        userId: lock.user_id,
+        name: user ? userLabel(user) : 'Someone',
+        avatarUrl: user?.avatar_url ?? null,
+        color: userColor(lock.user_id),
+      }
+    }
+    return result
+  }, [collab.locks, collab.users, collab.connId])
 
   const descriptorFor = useMemo(() => {
     const map = new Map<string, { descriptor: NonNullable<typeof nodeLibrary>['builtin'][number]; category: string }>()
@@ -222,7 +367,7 @@ export function EditorPage() {
     }
   }
 
-  const selectedNode = spec.nodes.find((n) => n.id === selectedNodeId) ?? null
+  const selectedNode = selectedNodeId && lockHolders[lockKey('node', selectedNodeId)] ? null : spec.nodes.find((n) => n.id === selectedNodeId) ?? null
   const selectedMeta = selectedNode ? descriptorFor.get(selectedNode.type) : undefined
   const hasErrors = Boolean(validation && !validation.valid && validation.errors.length > 0)
   const saving = updateWorkspace.isPending
@@ -264,9 +409,10 @@ export function EditorPage() {
         <IconButton size="sm" className="help-btn" tip="Keyboard shortcuts" tipSide="bottom" onClick={() => setShowShortcuts(true)}>
           <HelpIcon className="w-4 h-4" />
         </IconButton>
-        <span className={cn('save-state', saving && 'busy')}>
+        {collab.status !== 'connecting' && <PresenceBar users={collab.users} meId={collab.me?.id} status={collab.status} />}
+        <span className={cn('save-state', saving && 'busy')} title={notice ?? undefined}>
           <i />
-          {saving ? 'Saving…' : 'Saved'}
+          {notice ?? (saving ? 'Saving…' : 'Saved')}
         </span>
         <Button type="button" size="sm" onClick={handleRun} loading={createRun.isPending}>
           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
@@ -280,13 +426,15 @@ export function EditorPage() {
         <ToolSidebar workspaceId={workspaceId} nodeLibrary={nodeLibrary} />
         <Canvas
           spec={spec}
-          onSpecChange={setSpec}
+          onSpecChange={handleSpecChange}
           nodeLibrary={nodeLibrary}
           nodeErrors={nodeErrors}
           focusNodeId={focusNodeId}
           highlightNodeId={hoverNodeId}
           selectedNodeId={selectedNodeId}
           onSelectedNodeIdChange={setSelectedNodeId}
+          onSelectionTargetsChange={collab.syncSelection}
+          locks={lockHolders}
           actionsRef={actionsRef}
         />
         {selectedNode && (

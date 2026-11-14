@@ -13,7 +13,8 @@ from app.core.engine import get_engine
 from app.core.exceptions import AppError, NotFoundError
 from app.core.queue import enqueue_run, request_cancel, subscribe_run_events
 from app.database import get_db
-from app.dependencies import get_accessible_workspace, get_current_user, resolve_workspace_access
+from app.dependencies import get_current_user, resolve_workspace_access
+from app.run.policy import require_history_access, require_run_permission
 from app.run.spec import assert_web_supported_nodes, strip_bucket_params
 from app.run import service
 from app.run.schemas import RunCreate, RunEventRead, RunRead, SchemaResponse, ValidateRequest, ValidateResponse
@@ -26,7 +27,7 @@ router = APIRouter(prefix="/workspaces/{workspace_id}/runs", tags=["runs"])
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
 def create(
     payload: RunCreate,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_run_permission),
     engine: Engine = Depends(get_engine),
     db: Session = Depends(get_db),
 ):
@@ -40,7 +41,7 @@ def create(
 @router.post("/validate", response_model=ValidateResponse)
 def validate(
     payload: ValidateRequest,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_run_permission),
     engine: Engine = Depends(get_engine),
 ):
     spec = strip_bucket_params(payload.spec)
@@ -58,7 +59,7 @@ def validate(
 @router.post("/schema", response_model=SchemaResponse)
 def infer_schema(
     payload: ValidateRequest,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_run_permission),
     engine: Engine = Depends(get_engine),
 ):
     spec = strip_bucket_params(payload.spec)
@@ -76,7 +77,7 @@ def list_(
     kind: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_history_access),
     db: Session = Depends(get_db),
 ):
     return service.list_runs(db, workspace_id=workspace.id, status=status, kind=kind, limit=limit, offset=offset)
@@ -84,7 +85,7 @@ def list_(
 @router.get("/{run_id}", response_model=RunRead)
 def get(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_history_access),
     db: Session = Depends(get_db),
 ):
     run = service.get_run(db, workspace_id=workspace.id, run_id=run_id)
@@ -95,7 +96,7 @@ def get(
 @router.post("/{run_id}/cancel", response_model=RunRead)
 def cancel(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_run_permission),
     db: Session = Depends(get_db),
 ):
     run = service.get_run(db, workspace_id=workspace.id, run_id=run_id)
@@ -110,7 +111,7 @@ def cancel(
 @router.get("/{run_id}/events/history", response_model=list[RunEventRead])
 def event_history(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_history_access),
     db: Session = Depends(get_db),
 ):
     run = service.get_run(db, workspace_id=workspace.id, run_id=run_id)
@@ -122,7 +123,7 @@ def event_history(
 async def stream_events(
     run_id: uuid.UUID,
     request: Request,
-    workspace: Workspace = Depends(get_accessible_workspace),
+    workspace: Workspace = Depends(require_history_access),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
