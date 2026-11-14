@@ -18,7 +18,7 @@
 .meter i { transition: background-color 0.35s; }
 a { transition: color 0.15s; }
 
-.skeleton { background: linear-gradient(110deg, var(--cream-soft) 30%, var(--white) 50%, var(--cream-soft) 70%) 0 0 / 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: var(--r-s); }
+.skeleton { background: linear-gradient(110deg, var(--surface-2) 30%, var(--white) 50%, var(--surface-2) 70%) 0 0 / 200% 100%; animation: shimmer 1.6s linear infinite; border-radius: var(--r-s); }
 
 @media (prefers-reduced-motion: no-preference) {
   .overlay { animation: fade-in 0.18s ease-out; }

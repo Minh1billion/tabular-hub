@@ -1,6 +1,7 @@
 import { cn } from '@/shared/lib/cn'
 import { oauthLoginUrl } from '@/shared/lib/api-client'
 import { OAuthProvider } from '../types'
+import { markLoginIntent } from '../login-intent'
 
 const providerConfig: Record<OAuthProvider, { label: string; className: string }> = {
   google: { label: 'Continue with Google', className: '' },
@@ -52,7 +53,7 @@ export function OAuthButton({ provider }: OAuthButtonProps) {
   const Icon = icons[provider]
 
   return (
-    <a href={oauthLoginUrl(provider)} className={cn('oauth', className)}>
+    <a href={oauthLoginUrl(provider)} className={cn('oauth', className)} onClick={markLoginIntent}>
       <Icon />
       <span>{label}</span>
     </a>

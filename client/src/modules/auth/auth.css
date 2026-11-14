@@ -1,0 +1,13 @@
+.login-modal { width: min(400px, 100%); padding: 24px 26px 22px; }
+.login-modal .modal-head { margin-bottom: 4px; }
+.login-lead { margin: 0 0 20px; font-size: 13.5px; line-height: 1.6; color: var(--slate); }
+.oauth-stack { display: flex; flex-direction: column; gap: 10px; }
+.login-terms { margin: 18px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.login-terms a { color: var(--slate); text-decoration: underline; text-underline-offset: 2px; }
+
+.oauth { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px; font: inherit; font-weight: 600; font-size: 14px; text-decoration: none; cursor: pointer; color: var(--ink); background: var(--white); border: var(--edge); border-radius: var(--r-s); box-shadow: 0 2px 0 var(--ink); transition: transform 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out), background-color 0.15s; }
+.oauth:hover { background: var(--brand-tint); transform: translateY(-1px); box-shadow: 0 3px 0 var(--ink); }
+.oauth:active { transform: translateY(2px); box-shadow: 0 0 0 var(--ink); }
+.oauth.dark { background: var(--brand-deep); color: var(--brand-tint); }
+.oauth.dark:hover { background: #1a5640; }
+.oauth span { flex: 1; text-align: left; }

@@ -7,7 +7,7 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   flat?: boolean
   active?: boolean
   tip?: string
-  tipSide?: 'top' | 'right' | 'left'
+  tipSide?: 'top' | 'right' | 'left' | 'bottom'
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(

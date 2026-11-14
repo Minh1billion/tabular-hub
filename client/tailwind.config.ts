@@ -5,8 +5,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        cream: 'var(--cream)',
-        'cream-soft': 'var(--cream-soft)',
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
         white: 'var(--white)',
         line: 'var(--line)',
         ink: 'var(--ink)',

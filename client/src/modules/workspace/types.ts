@@ -16,7 +16,6 @@ export interface WorkspaceLastRun {
   created_at: string
 }
 
-/** Workspace as returned by `GET /workspaces`, enriched with activity stats for the list page. */
 export interface WorkspaceListItem extends Workspace {
   dataset_count: number
   last_run: WorkspaceLastRun | null

@@ -13,7 +13,7 @@ export function AuthGuard({ children }: PropsWithChildren) {
     )
   }
 
-  if (!user) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/" replace state={{ login: true }} />
 
   return <>{children}</>
 }

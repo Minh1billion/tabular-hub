@@ -131,7 +131,6 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const [confirmingClose, setConfirmingClose] = useState(false)
-  // Bumped to remount FileDrop so its hidden <input> is cleared (lets the user re-pick the same file).
   const [dropKey, setDropKey] = useState(0)
   const keyEditedRef = useRef(false)
   const notifiedRef = useRef(false)
@@ -193,7 +192,6 @@ export function ImportResourceDialog({ workspaceId, onClose, onImported }: Impor
     return null
   }
 
-  // Re-check once the subscription loads (or changes) after a file was already picked.
   useEffect(() => {
     if (!file) return
     const sizeError = getSizeError(file)

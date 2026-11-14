@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom'
 import { cn } from '@/shared/lib/cn'
 import { NodeDescriptor } from '@/modules/editor/types'
-import { CategoryIcon } from '../nodes/category'
+import { NodeIcon } from '../nodes/icons'
 
 const GAP = 12
 const EDGE = 8
@@ -44,6 +44,11 @@ function preview(value: unknown) {
   if (value === undefined || value === null || value === '') return null
   const text = typeof value === 'string' ? value : JSON.stringify(value)
   return text.length > 22 ? `${text.slice(0, 21)}…` : text
+}
+
+export function countMissingParams(descriptor: NodeDescriptor | undefined, params: Record<string, unknown>) {
+  if (!descriptor) return 0
+  return Object.keys(descriptor.required).filter((key) => key !== 'bucket' && preview(params[key]) === null).length
 }
 
 type Placement = 'below' | 'above' | 'right' | 'left'
@@ -118,8 +123,8 @@ export function NodeTip({ rect, prefer = 'below', label, nodeType, category, des
       <span className="ntip-arrow" />
 
       <div className="ntip-head">
-        <span className="cat-tile">
-          <CategoryIcon category={category} />
+        <span className="cat-tile nt">
+          <NodeIcon type={nodeType} category={category} />
         </span>
         <div className="ntip-id">
           <strong>{label}</strong>

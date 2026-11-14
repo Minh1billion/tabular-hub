@@ -1,8 +1,8 @@
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { GridPattern } from '@/shared/components/ui/GridPattern'
 import { PageHead } from '@/shared/components/ui/PageHead'
 import { Button } from '@/shared/components/ui/Button'
-import { AlertIcon } from '@/shared/components/ui/icons'
+import { AlertIcon, ArrowLeftIcon } from '@/shared/components/ui/icons'
 import { useCheckout, usePlans, usePortal, useSubscription } from '../hooks'
 import { PlanCard } from '../components/PlanCard'
 import { UsageMeter } from '../components/UsageMeter'
@@ -25,7 +25,17 @@ export function BillingPage() {
       <div className="pg">
         <GridPattern cellSize={28} className="pg-grid" />
         <div className="pg-body bl-skel">
-          <PageHead kicker="Billing" title="Billing" subtitle="Manage your plan, usage, and payment details." />
+          <PageHead
+            kicker="Billing"
+            title="Billing"
+            subtitle="Manage your plan, usage, and payment details."
+            actions={
+              <Link to="/app" className="btn btn-outline btn-sm">
+                <ArrowLeftIcon className="w-3.5 h-3.5" />
+                Back to editor
+              </Link>
+            }
+          />
           <div className="bl-layout">
             <div className="bl-main">
               <div className="plans">
@@ -57,11 +67,17 @@ export function BillingPage() {
           title="Billing"
           subtitle="Manage your plan, usage, and payment details."
           actions={
-            subscription.tier !== 'free' && (
-              <Button variant="outline" size="sm" onClick={() => portal.mutate()} loading={portal.isPending}>
-                {portal.isPending ? 'Opening…' : 'Manage billing'}
-              </Button>
-            )
+            <>
+              <Link to="/app" className="btn btn-outline btn-sm">
+                <ArrowLeftIcon className="w-3.5 h-3.5" />
+                Back to editor
+              </Link>
+              {subscription.tier !== 'free' && (
+                <Button variant="outline" size="sm" onClick={() => portal.mutate()} loading={portal.isPending}>
+                  {portal.isPending ? 'Opening…' : 'Manage billing'}
+                </Button>
+              )}
+            </>
           }
         />
 

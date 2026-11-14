@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-#
-# dev.sh - start the local dev stack (docker compose) and attach the
-# Stripe CLI webhook listener on top of it.
-#
-# Usage:
-#   ./dev.sh              start everything
-#   ./dev.sh --no-build   skip the `--build` step
-#
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -15,7 +7,6 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# Load .env into this shell so STRIPE_SECRET_KEY etc. are available below.
 set -a
 # shellcheck disable=SC1091
 source .env
@@ -46,10 +37,6 @@ for i in $(seq 1 30); do
   fi
 done
 
-# Where the Stripe CLI container should send webhooks. On Linux, --network
-# host lets it reach "localhost:8000" directly. On Docker Desktop (Mac/
-# Windows), --network host is a no-op, so we forward to
-# host.docker.internal instead.
 UNAME_S="$(uname -s)"
 if [[ "$UNAME_S" == "Linux" ]]; then
   NETWORK_ARGS=(--network host)

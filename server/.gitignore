@@ -18,12 +18,7 @@ dist/
 # Package managers
 .uv/
 
-# Testing
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-test.db
+# Local databases
 *.db
 *.sqlite3
 

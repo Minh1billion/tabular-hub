@@ -17,12 +17,12 @@ import {
 } from '@xyflow/react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/editor/types'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
-import { NODE_DROP_EVENT, PaletteDrop } from '@/modules/editor/nodes/lib/usePaletteDrag'
+import { NODE_DROP_EVENT, NODE_TILE, PaletteDrop } from '@/modules/editor/nodes/lib/usePaletteDrag'
 import { CategoryIcon, categoryOf } from '../nodes/category'
 import { GraphConnection, GraphNode, GraphSpec } from '../types'
 import { useHotkeys } from '@/shared/hooks/useHotkeys'
 import { bind } from '../shortcuts'
-import { PipelineNode, PipelineNodeData } from './PipelineNode'
+import { NODE_DELETE_EVENT, PipelineNode, PipelineNodeData } from './PipelineNode'
 
 const HISTORY_LIMIT = 100
 const PASTE_STEP = 32
@@ -41,7 +41,7 @@ const nodeTypes: NodeTypes = { pipeline: PipelineNode }
 
 const defaultEdgeOptions = {
   type: 'smoothstep',
-  markerEnd: { type: MarkerType.ArrowClosed, color: '#16231c', width: 16, height: 16 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: '#8b9089', width: 14, height: 14 },
 }
 
 function edgeId(connection: GraphConnection) {
@@ -380,7 +380,7 @@ export function Canvas({
       const { nodeType, label, params, x, y, width } = (event as CustomEvent<PaletteDrop>).detail
       if (!nodeType || !reactFlowInstance.current) return
 
-      const position = reactFlowInstance.current.screenToFlowPosition({ x: x - width / 2, y: y - 22 })
+      const position = reactFlowInstance.current.screenToFlowPosition({ x: x - width / 2, y: y - NODE_TILE / 2 })
 
       const id = crypto.randomUUID()
       pushHistory()
@@ -434,6 +434,12 @@ export function Canvas({
     },
     [setEdges, pushHistory],
   )
+
+  useEffect(() => {
+    const onDelete = (event: Event) => deleteNode((event as CustomEvent<string>).detail)
+    window.addEventListener(NODE_DELETE_EVENT, onDelete)
+    return () => window.removeEventListener(NODE_DELETE_EVENT, onDelete)
+  }, [deleteNode])
 
   const lastPushedSpecRef = useRef<string | null>(null)
 
