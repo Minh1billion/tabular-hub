@@ -14,13 +14,17 @@ from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+def _cookie_samesite() -> str:
+    return "none" if settings.COOKIE_SECURE else "lax"
+
+
 def _set_auth_cookie(response: RedirectResponse, token: str) -> None:
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        samesite=_cookie_samesite(),
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -79,7 +83,12 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(response: Response):
-    response.delete_cookie("access_token")
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=_cookie_samesite(),
+    )
 
 @router.get("/me", response_model=UserRead)
 async def me(current_user: User = Depends(get_current_user)):
