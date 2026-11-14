@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getAuthToken } from '@/shared/lib/api-client'
 import { getRun } from './api'
 import { Run, TERMINAL_RUN_EVENTS } from './types'
 
@@ -27,7 +28,12 @@ export function useRunTracking(workspaceId: string | undefined, runId: string | 
     if (!workspaceId || !runId) return
     if (isTerminal(status)) return
 
-    const source = new EventSource(`${API_URL}/workspaces/${workspaceId}/runs/${runId}/events`, {
+    const token = getAuthToken()
+    const eventsUrl = new URL(`${API_URL}/workspaces/${workspaceId}/runs/${runId}/events`)
+    if (token) {
+      eventsUrl.searchParams.set('token', token)
+    }
+    const source = new EventSource(eventsUrl.toString(), {
       withCredentials: true,
     })
 

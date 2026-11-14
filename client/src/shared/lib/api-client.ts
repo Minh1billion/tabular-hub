@@ -1,4 +1,28 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const TOKEN_STORAGE_KEY = 'tabular_hub_access_token'
+
+function consumeHashToken(): void {
+  if (typeof window === 'undefined') return
+  const hash = window.location.hash
+  if (!hash.startsWith('#token=')) return
+  const token = decodeURIComponent(hash.slice('#token='.length))
+  if (token) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  }
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
+consumeHashToken()
+
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY)
+}
+
+export function clearAuthToken(): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+}
 
 export class ApiError extends Error {
   status: number
@@ -15,12 +39,25 @@ type RequestOptions = {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (options.body) {
+    headers['Content-Type'] = 'application/json'
+  }
+  const token = getAuthToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
-    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: options.body ? JSON.stringify(options.body) : undefined,
   })
+
+  if (path === '/auth/logout' && response.ok) {
+    clearAuthToken()
+  }
 
   if (response.status === 204) {
     return undefined as T

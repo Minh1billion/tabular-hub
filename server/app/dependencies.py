@@ -9,8 +9,17 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.workspace.models import Workspace
 
+def _extract_token(request: Request) -> str | None:
+    if cookie_token := request.cookies.get("access_token"):
+        return cookie_token
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+    return request.query_params.get("token")
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    token = request.cookies.get("access_token")
+    token = _extract_token(request)
     if not token:
         raise UnauthorizedError("Not authenticated")
 

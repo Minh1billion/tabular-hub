@@ -77,7 +77,8 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
     )
 
     access_token = create_access_token(str(user.id))
-    response = RedirectResponse(url=settings.FRONTEND_URL)
+    frontend_base = settings.FRONTEND_URL.rstrip("/")
+    response = RedirectResponse(url=f"{frontend_base}/#token={access_token}")
     _set_auth_cookie(response, access_token)
     return response
 
