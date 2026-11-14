@@ -63,6 +63,11 @@ export function WorkspaceSwitcher() {
                   }}
                 >
                   <span className="truncate">{w.name}</span>
+                  {w.role === 'member' && (
+                    <span className="ws-tag" title={w.owner ? `Shared by ${w.owner.display_name || w.owner.email}` : 'Shared with you'}>
+                      Shared
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -77,7 +82,7 @@ export function WorkspaceSwitcher() {
                 <PlusIcon />
                 New workspace
               </button>
-              {active && (
+              {active?.role === 'owner' && (
                 <>
                   <button
                     type="button"

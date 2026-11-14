@@ -1,0 +1,16 @@
+.sh-modal { width: min(520px, 100%); }
+.sh-invite { display: flex; align-items: center; gap: 8px; }
+.sh-invite .input { flex: 1; min-width: 0; }
+.sh-note { margin: 0 0 12px; padding: 10px 12px; font-size: 13px; line-height: 1.5; background: var(--brand-tint); border: 1px solid var(--brand-tint-2); border-radius: var(--r-s); }
+.sh-note p { margin: 0; }
+.sh-note p + p { margin-top: 4px; }
+.sh-warn { color: var(--warn); font-weight: 500; }
+.sh-link { padding: 0; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; background: none; border: 0; cursor: pointer; }
+.sh-section { margin-top: 6px; }
+.sh-section h3 { margin: 0 0 8px; font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sh-list { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; padding: 0; list-style: none; max-height: 260px; overflow-y: auto; }
+.sh-row { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-bottom: var(--edge-soft); }
+.sh-row:last-child { border-bottom: 0; }
+.sh-who { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.sh-who b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.sh-who small { overflow: hidden; font-size: 12px; color: var(--slate); text-overflow: ellipsis; white-space: nowrap; }

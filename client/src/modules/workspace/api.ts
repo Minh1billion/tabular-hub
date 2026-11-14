@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/lib/api-client'
-import { CreateWorkspacePayload, UpdateWorkspacePayload, Workspace, WorkspaceListItem } from './types'
+import { CreateWorkspacePayload, InviteResult, UpdateWorkspacePayload, Workspace, WorkspaceListItem, WorkspaceMembers } from './types'
 
 export function listWorkspaces() {
   return apiClient.get<WorkspaceListItem[]>('/workspaces')
@@ -19,4 +19,20 @@ export function updateWorkspace(workspaceId: string, payload: UpdateWorkspacePay
 
 export function deleteWorkspace(workspaceId: string) {
   return apiClient.delete<void>(`/workspaces/${workspaceId}`)
+}
+
+export function listMembers(workspaceId: string) {
+  return apiClient.get<WorkspaceMembers>(`/workspaces/${workspaceId}/members`)
+}
+
+export function inviteMember(workspaceId: string, email: string) {
+  return apiClient.post<InviteResult>(`/workspaces/${workspaceId}/members`, { email })
+}
+
+export function removeMember(workspaceId: string, userId: string) {
+  return apiClient.delete<void>(`/workspaces/${workspaceId}/members/${userId}`)
+}
+
+export function revokeInvitation(workspaceId: string, invitationId: string) {
+  return apiClient.delete<void>(`/workspaces/${workspaceId}/invitations/${invitationId}`)
 }

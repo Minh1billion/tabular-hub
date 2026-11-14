@@ -9,7 +9,7 @@ from tabular_manner.engine.bootstrap import Engine
 from app.core import staging
 from app.core.engine import get_engine
 from app.database import get_db
-from app.dependencies import get_owned_workspace
+from app.dependencies import get_accessible_workspace
 from app.resources import service
 from app.resources.schemas import (
     ExportDownloadResponse,
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/workspaces/{workspace_id}/resources", tags=["resourc
 @router.post("/presign-upload", response_model=PresignUploadResponse, status_code=status.HTTP_201_CREATED)
 def presign_upload(
     payload: PresignUploadRequest,
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     db: Session = Depends(get_db),
 ):
     run, post, staging_key = service.presign_upload(
@@ -47,13 +47,13 @@ def presign_upload(
 @router.post("/{run_id}/confirm-upload", response_model=RunRead)
 def confirm_upload(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     db: Session = Depends(get_db),
 ):
     return service.confirm_upload(db, workspace=workspace, run_id=run_id)
 
 @router.get("", response_model=ResourceListResponse)
-def list_resources(workspace: Workspace = Depends(get_owned_workspace), engine: Engine = Depends(get_engine)):
+def list_resources(workspace: Workspace = Depends(get_accessible_workspace), engine: Engine = Depends(get_engine)):
     return service.list_resources(engine, bucket=str(workspace.id))
 
 @router.get("/{key}", response_model=ResourcePreviewResponse)
@@ -61,7 +61,7 @@ def preview_resource(
     key: str,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     engine: Engine = Depends(get_engine),
 ):
     return service.preview_resource(engine, str(workspace.id), key, limit, offset)
@@ -69,7 +69,7 @@ def preview_resource(
 @router.delete("/{key}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_resource(
     key: str,
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     db: Session = Depends(get_db),
     engine: Engine = Depends(get_engine),
 ):
@@ -79,7 +79,7 @@ def delete_resource(
 def export_resource(
     key: str,
     payload: ExportResourceCreate,
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     db: Session = Depends(get_db),
 ):
     return service.export_resource(
@@ -90,7 +90,7 @@ def export_resource(
 def download_export(
     key: str,
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_owned_workspace),
+    workspace: Workspace = Depends(get_accessible_workspace),
     db: Session = Depends(get_db),
 ):
     return ExportDownloadResponse(download_url=service.get_export_download_url(db, workspace=workspace, run_id=run_id))

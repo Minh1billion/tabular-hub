@@ -26,6 +26,7 @@
 .ws-list button:hover { background: var(--brand-tint); }
 .ws-list button[aria-selected='true'] { background: var(--brand-tint); font-weight: 600; }
 .ws-list button[aria-selected='true']::after { content: ''; flex: none; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--brand); }
+.ws-list button .ws-tag { flex: none; padding: 1px 6px; font-family: var(--font-mono); font-size: 9.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 999px; }
 .ws-list .ws-actions { margin-top: 5px; padding-top: 5px; border-top: var(--edge-soft); }
 .ws-list .ws-actions button { font-weight: 600; }
 .ws-list .ws-actions button svg { flex: none; width: 15px; height: 15px; }

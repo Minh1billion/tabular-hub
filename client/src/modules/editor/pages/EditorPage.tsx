@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDebounce } from '@/shared/hooks/useDebounce'
+import { ApiError } from '@/shared/lib/api-client'
+import { Badge } from '@/shared/components/ui/Badge'
 import { Button } from '@/shared/components/ui/Button'
-import { CheckIcon, HelpIcon } from '@/shared/components/ui/icons'
+import { CheckIcon, HelpIcon, ShareIcon } from '@/shared/components/ui/icons'
 import { cn } from '@/shared/lib/cn'
 import { useUpdateWorkspace, useWorkspace } from '@/modules/workspace/hooks'
+import { ShareDialog } from '@/modules/workspace/components/ShareDialog'
 import { useGraphSchema, useNodeLibrary } from '@/modules/editor/nodes/hooks'
 import { useCreateRun, useValidateSpec } from '@/modules/runs/hooks'
 import { ValidateResponse } from '@/modules/runs/types'
@@ -77,7 +80,7 @@ function ErrorsTab({
 export function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const workspaceId = id ?? ''
-  const { data: workspace, isLoading, isError: workspaceFailed } = useWorkspace(workspaceId)
+  const { data: workspace, isLoading, isError: workspaceFailed, error: workspaceError } = useWorkspace(workspaceId)
   const updateWorkspace = useUpdateWorkspace(workspaceId)
   const { data: nodeLibrary } = useNodeLibrary(workspaceId)
 
@@ -99,6 +102,7 @@ export function EditorPage() {
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
   const [hoverNodeId, setHoverNodeId] = useState<string | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() =>
     localStorage.getItem(`canvas.selectedNodeId:${workspaceId}`),
   )
@@ -185,11 +189,16 @@ export function EditorPage() {
   }, [nodeLibrary])
 
   if (workspaceFailed) {
+    const accessLost = workspaceError instanceof ApiError && workspaceError.status === 403
     return (
       <div className="ed-empty">
         <div className="panel rise">
-          <h1 className="m-0 mb-2 text-[20px] font-bold tracking-tight">Workspace not found</h1>
-          <p className="m-0 mb-5 text-[13.5px] text-slate">It may have been deleted, or you don't have access to it.</p>
+          <h1 className="m-0 mb-2 text-[20px] font-bold tracking-tight">{accessLost ? 'Access removed' : 'Workspace not found'}</h1>
+          <p className="m-0 mb-5 text-[13.5px] text-slate">
+            {accessLost
+              ? "You no longer have access to this workspace. The owner may have removed you. Any changes you haven't saved were not kept."
+              : "It may have been deleted, or you don't have access to it."}
+          </p>
           <Link to="/app" className="btn btn-primary btn-md">
             Open another workspace
           </Link>
@@ -245,6 +254,13 @@ export function EditorPage() {
   return (
     <div className="ed">
       <TopbarPortal>
+        {workspace?.role === 'member' && <Badge tone="team">Shared</Badge>}
+        {workspace?.role === 'owner' && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowShare(true)}>
+            <ShareIcon className="w-3.5 h-3.5" />
+            Share
+          </Button>
+        )}
         <IconButton size="sm" className="help-btn" tip="Keyboard shortcuts" tipSide="bottom" onClick={() => setShowShortcuts(true)}>
           <HelpIcon className="w-4 h-4" />
         </IconButton>
@@ -291,6 +307,7 @@ export function EditorPage() {
       </div>
 
       {showShortcuts && <ShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+      {showShare && workspace?.role === 'owner' && <ShareDialog workspace={workspace} onClose={() => setShowShare(false)} />}
 
       <BottomPanel tabs={tabs} open={panelOpen} onOpenChange={setPanelOpen} activeTabId={tabId} onActiveTabChange={setTabId} />
     </div>

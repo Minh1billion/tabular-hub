@@ -52,5 +52,17 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_PRO: str
     STRIPE_PRICE_ID_TEAM: str
 
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str | None = None
+    SMTP_FROM_NAME: str = "Tabular Hub"
+    SMTP_USE_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 10
+
+    INVITATION_TTL_DAYS: int = 7
+
 
 settings = Settings()
