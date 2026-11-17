@@ -11,6 +11,7 @@ from app.core.exceptions import AppError
 from app.core.security import create_access_token
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.workspace import service as workspace_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -51,15 +52,19 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         display_name = userinfo.get("name")
         avatar_url = userinfo.get("picture")
         provider_user_id = userinfo["sub"]
+        email_verified = bool(userinfo.get("email_verified"))
     else:
         profile_resp = await client.get("user", token=token)
         profile = profile_resp.json()
         email = profile.get("email")
+        email_verified = bool(email)
         if not email:
             emails_resp = await client.get("user/emails", token=token)
             emails = emails_resp.json()
             primary = next((e for e in emails if e.get("primary")), None)
-            email = (primary or (emails[0] if emails else {})).get("email")
+            chosen = primary or (emails[0] if emails else {})
+            email = chosen.get("email")
+            email_verified = bool(chosen.get("verified"))
         if not email:
             raise AppError("GitHub account has no accessible email")
         display_name = profile.get("name") or profile.get("login")
@@ -75,6 +80,9 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         provider_user_id=provider_user_id,
         access_token=token.get("access_token"),
     )
+
+    if email_verified:
+        workspace_service.accept_pending_invitations(db, user=user, email=email)
 
     access_token = create_access_token(str(user.id))
     frontend_base = settings.FRONTEND_URL.rstrip("/")

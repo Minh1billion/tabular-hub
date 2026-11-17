@@ -7,6 +7,7 @@
 @import '../../modules/editor/editor.css';
 @import '../../modules/resources/resources.css';
 @import '../../modules/billing/billing.css';
+@import '../../modules/workspace/workspace.css';
 @import '../../modules/runs/runs.css';
 @import '../../app/pages/home.css';
 

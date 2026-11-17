@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { CSSProperties, useEffect, useState } from 'react'
 import { Handle, NodeProps, Position } from '@xyflow/react'
 import { cn } from '@/shared/lib/cn'
+import { Avatar } from '@/shared/components/ui/Avatar'
+import { LockHolder } from '@/modules/collab/types'
 import { NodeDescriptor } from '@/modules/editor/types'
 import { NodeIcon, PencilIcon, TrashIcon } from '../nodes/icons'
 import { NodeTip, countMissingParams, useHoverRect } from './NodeTip'
@@ -16,6 +18,7 @@ export interface PipelineNodeData {
   hasError?: boolean
   errorMessages?: string[]
   highlighted?: boolean
+  lockedBy?: LockHolder | null
   onRename?: (name: string) => void
   renameSignal?: number
   [key: string]: unknown
@@ -23,7 +26,8 @@ export interface PipelineNodeData {
 
 export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
   const nodeData = data as PipelineNodeData
-  const { label, nodeType, category = 'Transform', params, descriptor, hasError, errorMessages, highlighted, onRename, renameSignal } = nodeData
+  const { label, nodeType, category = 'Transform', params, descriptor, hasError, errorMessages, highlighted, lockedBy, onRename, renameSignal } = nodeData
+  const locked = Boolean(lockedBy)
   const { rect, show, hide } = useHoverRect()
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(label)
@@ -33,7 +37,7 @@ export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
   }, [dragging, hide])
 
   useEffect(() => {
-    if (renameSignal) {
+    if (renameSignal && !locked) {
       setDraft(label)
       setIsEditing(true)
     }
@@ -41,6 +45,7 @@ export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
   }, [renameSignal])
 
   function startEditing() {
+    if (locked) return
     hide()
     setDraft(label)
     setIsEditing(true)
@@ -54,6 +59,7 @@ export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
   }
 
   function requestDelete() {
+    if (locked) return
     hide()
     window.dispatchEvent(new CustomEvent<string>(NODE_DELETE_EVENT, { detail: id }))
   }
@@ -64,7 +70,8 @@ export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
 
   return (
     <div
-      className={cn('nx', selected && 'selected', hasError && 'error', needsSetup && 'setup', highlighted && 'hl')}
+      className={cn('nx', selected && 'selected', hasError && 'error', needsSetup && 'setup', highlighted && 'hl', locked && 'locked')}
+      style={lockedBy ? ({ '--lock': lockedBy.color } as CSSProperties) : undefined}
       data-cat={category}
       onPointerEnter={(event) => !dragging && show(event.currentTarget)}
       onPointerLeave={hide}
@@ -84,7 +91,14 @@ export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
         {hasError && <span className="nx-badge err">!</span>}
         {needsSetup && <span className="nx-badge warn">!</span>}
 
-        {!isEditing && (
+        {lockedBy && (
+          <div className="nx-lock" title={`Being edited by ${lockedBy.name}`}>
+            <Avatar name={lockedBy.name} imageUrl={lockedBy.avatarUrl} size={16} />
+            <span>{lockedBy.name}</span>
+          </div>
+        )}
+
+        {!isEditing && !locked && (
           <div className="nx-bar nodrag nopan" onPointerDown={(event) => event.stopPropagation()}>
             <button type="button" aria-label="Rename node" onClick={startEditing}>
               <PencilIcon />

@@ -16,6 +16,8 @@ import {
   useNodesState,
 } from '@xyflow/react'
 import { NodeDescriptor, NodeLibrary } from '@/modules/editor/types'
+import { edgeKey, mergeSpecs, overlayElements } from '@/modules/collab/lib/merge'
+import { LockHolder, LockTarget, lockKey } from '@/modules/collab/types'
 import { ContextMenu } from '@/shared/components/ui/ContextMenu'
 import { NODE_DROP_EVENT, NODE_TILE, PaletteDrop } from '@/modules/editor/nodes/lib/usePaletteDrag'
 import { CategoryIcon, categoryOf } from '../nodes/category'
@@ -35,7 +37,11 @@ export interface CanvasActions {
   updateParams: (id: string, params: Record<string, unknown>) => void
   rename: (id: string, name: string) => void
   deselect: () => void
+  deselectElements: (targets: LockTarget[]) => void
+  applyRemote: (merged: GraphSpec, previousBase: GraphSpec, remote: GraphSpec) => void
 }
+
+type LockMap = Record<string, LockHolder>
 
 const nodeTypes: NodeTypes = { pipeline: PipelineNode }
 
@@ -44,9 +50,7 @@ const defaultEdgeOptions = {
   markerEnd: { type: MarkerType.ArrowClosed, color: '#8b9089', width: 14, height: 14 },
 }
 
-function edgeId(connection: GraphConnection) {
-  return [connection.from, connection.to, connection.on, connection.into].filter(Boolean).join(':')
-}
+const edgeId = edgeKey
 
 function toFlowNodes(
   nodes: GraphNode[],
@@ -54,31 +58,59 @@ function toFlowNodes(
   categories: Map<string, string>,
   onRename: (id: string, name: string) => void,
   selectedNodeId: string | null,
+  locks: LockMap,
 ): Node[] {
-  return nodes.map((node) => ({
+  return nodes.map((node) => {
+    const lockedBy = locks[lockKey('node', node.id)] ?? null
+    return {
     id: node.id,
     type: 'pipeline',
     position: node.position,
-    selected: node.id === selectedNodeId,
+    selected: !lockedBy && node.id === selectedNodeId,
+    draggable: !lockedBy,
+    selectable: !lockedBy,
+    deletable: !lockedBy,
     data: {
       label: node.name,
       nodeType: node.type,
       category: categories.get(node.type) ?? 'Transform',
       params: node.params,
       descriptor: descriptors.get(node.type),
+      lockedBy,
       onRename: (name: string) => onRename(node.id, name),
     } satisfies PipelineNodeData,
-  }))
+    }
+  })
 }
 
-function toFlowEdges(connections: GraphConnection[]): Edge[] {
-  return connections.map((connection) => ({
-    id: edgeId(connection),
-    source: connection.from,
-    target: connection.to,
-    sourceHandle: connection.on,
-    targetHandle: connection.into,
-  }))
+function lockedEdgeProps(holder: LockHolder | undefined): Partial<Edge> {
+  if (!holder) return { selectable: true, deletable: true, label: undefined, style: undefined, className: undefined, selected: undefined }
+  return {
+    selectable: false,
+    deletable: false,
+    selected: false,
+    label: holder.name,
+    className: 'edge-locked',
+    style: { stroke: holder.color, strokeWidth: 2.5 },
+    labelStyle: { fill: holder.color, fontWeight: 600, fontSize: 11 },
+    labelBgStyle: { fill: 'var(--white)', fillOpacity: 0.95 },
+    labelBgPadding: [4, 2],
+    labelBgBorderRadius: 6,
+  }
+}
+
+function toFlowEdges(connections: GraphConnection[], locks: LockMap): Edge[] {
+  return connections.map((connection) => {
+    const id = edgeId(connection)
+    return {
+      id,
+      source: connection.from,
+      target: connection.to,
+      sourceHandle: connection.on,
+      targetHandle: connection.into,
+      ...lockedEdgeProps(locks[lockKey('edge', id)]),
+    }
+  })
 }
 
 function toGraphSpec(name: string, nodes: Node[], edges: Edge[]): GraphSpec {
@@ -112,6 +144,8 @@ interface CanvasProps {
   highlightNodeId?: string | null
   selectedNodeId: string | null
   onSelectedNodeIdChange: (id: string | null) => void
+  onSelectionTargetsChange: (targets: LockTarget[]) => void
+  locks: LockMap
   actionsRef: MutableRefObject<CanvasActions | null>
 }
 
@@ -124,8 +158,13 @@ export function Canvas({
   highlightNodeId,
   selectedNodeId,
   onSelectedNodeIdChange,
+  onSelectionTargetsChange,
+  locks,
   actionsRef,
 }: CanvasProps) {
+  const locksRef = useRef(locks)
+  locksRef.current = locks
+
   const descriptors = useMemo(() => {
     const map = new Map<string, NodeDescriptor>()
     nodeLibrary?.builtin.forEach((descriptor) => map.set(descriptor.type, descriptor))
@@ -149,10 +188,10 @@ export function Canvas({
   }
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
-    toFlowNodes(spec.nodes, descriptors, categories, renameNode, selectedNodeId),
+    toFlowNodes(spec.nodes, descriptors, categories, renameNode, selectedNodeId, locks),
   )
   setNodesRef.current = setNodes
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections))
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(toFlowEdges(spec.connections, locks))
   const [contextMenu, setContextMenu] = useState<CanvasContextMenu | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -182,9 +221,14 @@ export function Canvas({
     [snapshot],
   )
 
-  function restore(target: GraphSpec) {
-    setNodes(toFlowNodes(target.nodes, descriptors, categories, renameNode, null))
-    setEdges(toFlowEdges(target.connections))
+  function lockedKeys() {
+    return new Set(Object.keys(locksRef.current))
+  }
+
+  function restore(snapshotTarget: GraphSpec) {
+    const target = overlayElements(snapshotTarget, snapshot(), lockedKeys())
+    setNodes(toFlowNodes(target.nodes, descriptors, categories, renameNode, null, locksRef.current))
+    setEdges(toFlowEdges(target.connections, locksRef.current))
     onSelectedNodeIdChange(null)
   }
 
@@ -240,9 +284,12 @@ export function Canvas({
     pushHistory()
     setNodes((current) => [
       ...current.map((node) => (node.selected ? { ...node, selected: false } : node)),
-      ...toFlowNodes(addedNodes, descriptors, categories, renameNode, null).map((node) => ({ ...node, selected: true })),
+      ...toFlowNodes(addedNodes, descriptors, categories, renameNode, null, locksRef.current).map((node) => ({ ...node, selected: true })),
     ])
-    setEdges((current) => [...current.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)), ...toFlowEdges(addedConnections)])
+    setEdges((current) => [
+      ...current.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)),
+      ...toFlowEdges(addedConnections, locksRef.current),
+    ])
     return true
   }
 
@@ -250,10 +297,21 @@ export function Canvas({
     return copySelection() && pasteClipboard()
   }
 
+  function touchesForeignLock(removedIds: Set<string>, removedEdgeIds: Set<string>) {
+    const current = locksRef.current
+    for (const id of removedIds) if (current[lockKey('node', id)]) return true
+    for (const id of removedEdgeIds) if (current[lockKey('edge', id)]) return true
+    return edges.some(
+      (edge) => (removedIds.has(edge.source) || removedIds.has(edge.target)) && current[lockKey('edge', edge.id)],
+    )
+  }
+
   function deleteSelection() {
     const removedIds = new Set(nodes.filter((node) => node.selected).map((node) => node.id))
-    const hasEdges = edges.some((edge) => edge.selected)
+    const removedEdgeIds = new Set(edges.filter((edge) => edge.selected).map((edge) => edge.id))
+    const hasEdges = removedEdgeIds.size > 0
     if (removedIds.size === 0 && !hasEdges) return false
+    if (touchesForeignLock(removedIds, removedEdgeIds)) return true
     pushHistory()
     setNodes((current) => current.filter((node) => !removedIds.has(node.id)))
     setEdges((current) => current.filter((edge) => !edge.selected && !removedIds.has(edge.source) && !removedIds.has(edge.target)))
@@ -263,7 +321,7 @@ export function Canvas({
 
   function renameSelected(event: KeyboardEvent) {
     if (event.key === 'Enter' && (event.target as HTMLElement).closest('button, a, [role="button"]')) return false
-    const picked = nodes.filter((node) => node.selected)
+    const picked = nodes.filter((node) => node.selected && !locksRef.current[lockKey('node', node.id)])
     if (picked.length !== 1) return false
     setNodes((current) =>
       current.map((node) => (node.id === picked[0].id ? { ...node, data: { ...node.data, renameSignal: Date.now() } } : node)),
@@ -306,15 +364,69 @@ export function Canvas({
 
   actionsRef.current = {
     updateParams: (id, params) => {
+      if (locksRef.current[lockKey('node', id)]) return
       pushHistory(`params:${id}`)
       setNodes((current) => current.map((node) => (node.id === id ? { ...node, data: { ...node.data, params } } : node)))
     },
     rename: renameNode,
     deselect: () => {
       setNodes((current) => current.map((node) => (node.selected ? { ...node, selected: false } : node)))
+      setEdges((current) => current.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)))
       onSelectedNodeIdChange(null)
     },
+    deselectElements: (targets) => {
+      const nodeIds = new Set(targets.filter((target) => target.kind === 'node').map((target) => target.id))
+      const edgeIds = new Set(targets.filter((target) => target.kind === 'edge').map((target) => target.id))
+      setNodes((current) => current.map((node) => (nodeIds.has(node.id) && node.selected ? { ...node, selected: false } : node)))
+      setEdges((current) => current.map((edge) => (edgeIds.has(edge.id) && edge.selected ? { ...edge, selected: false } : edge)))
+    },
+    applyRemote: (merged, previousBase, remote) => {
+      pastRef.current = pastRef.current.map((entry) => mergeSpecs(previousBase, entry, remote))
+      futureRef.current = futureRef.current.map((entry) => mergeSpecs(previousBase, entry, remote))
+      const fresh = toFlowNodes(merged.nodes, descriptors, categories, renameNode, null, locksRef.current)
+      setNodes((current) => {
+        const previous = new Map(current.map((node) => [node.id, node]))
+        return fresh.map((node) => {
+          const existing = previous.get(node.id)
+          if (!existing) return node
+          if (existing.dragging) return existing
+          return { ...existing, ...node, selected: node.selectable === false ? false : existing.selected, data: { ...existing.data, ...node.data } }
+        })
+      })
+      setEdges((current) => {
+        const previous = new Map(current.map((edge) => [edge.id, edge]))
+        return toFlowEdges(merged.connections, locksRef.current).map((edge) => {
+          const existing = previous.get(edge.id)
+          return existing ? { ...existing, ...edge, selected: edge.selectable === false ? false : existing.selected } : edge
+        })
+      })
+    },
   }
+
+  useEffect(() => {
+    setNodes((current) =>
+      current.map((node) => {
+        const lockedBy = locks[lockKey('node', node.id)] ?? null
+        const currentLock = (node.data.lockedBy as LockHolder | null | undefined) ?? null
+        if (lockedBy?.userId === currentLock?.userId && Boolean(lockedBy) === Boolean(currentLock)) return node
+        return {
+          ...node,
+          selected: lockedBy ? false : node.selected,
+          draggable: !lockedBy,
+          selectable: !lockedBy,
+          deletable: !lockedBy,
+          data: { ...node.data, lockedBy },
+        }
+      }),
+    )
+    setEdges((current) =>
+      current.map((edge) => {
+        const holder = locks[lockKey('edge', edge.id)]
+        if (Boolean(holder) === (edge.selectable === false) && (!holder || edge.label === holder.name)) return edge
+        return { ...edge, ...lockedEdgeProps(holder) }
+      }),
+    )
+  }, [locks])
 
   useEffect(() => {
     setNodes((current) =>
@@ -343,8 +455,10 @@ export function Canvas({
 
   useEffect(() => {
     if (!focusNodeId) return
-    setNodes((current) => current.map((node) => ({ ...node, selected: node.id === focusNodeId })))
-    onSelectedNodeIdChange(focusNodeId)
+    if (!locksRef.current[lockKey('node', focusNodeId)]) {
+      setNodes((current) => current.map((node) => ({ ...node, selected: node.id === focusNodeId })))
+      onSelectedNodeIdChange(focusNodeId)
+    }
     const target = nodes.find((node) => node.id === focusNodeId)
     if (target && reactFlowInstance.current) {
       reactFlowInstance.current.setCenter(target.position.x + 80, target.position.y, { zoom: 1, duration: 300 })
@@ -409,26 +523,32 @@ export function Canvas({
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault()
+    if (locksRef.current[lockKey('node', node.id)]) return
     setContextMenu({ type: 'node', id: node.id, x: event.clientX, y: event.clientY })
   }, [])
 
   const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault()
+    if (locksRef.current[lockKey('edge', edge.id)]) return
     setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY })
   }, [])
 
   const deleteNode = useCallback(
     (id: string) => {
+      const current = locksRef.current
+      if (current[lockKey('node', id)]) return
+      if (edges.some((edge) => (edge.source === id || edge.target === id) && current[lockKey('edge', edge.id)])) return
       pushHistory()
       setNodes((current) => current.filter((node) => node.id !== id))
       setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id))
       if (selectedNodeId === id) onSelectedNodeIdChange(null)
     },
-    [setNodes, setEdges, selectedNodeId, onSelectedNodeIdChange, pushHistory],
+    [setNodes, setEdges, edges, selectedNodeId, onSelectedNodeIdChange, pushHistory],
   )
 
   const deleteEdge = useCallback(
     (id: string) => {
+      if (locksRef.current[lockKey('edge', id)]) return
       pushHistory()
       setEdges((current) => current.filter((edge) => edge.id !== id))
     },
@@ -470,7 +590,13 @@ export function Canvas({
         onInit={(instance) => {
           reactFlowInstance.current = instance
         }}
-        onSelectionChange={({ nodes: selected }) => onSelectedNodeIdChange(selected[0]?.id ?? null)}
+        onSelectionChange={({ nodes: selected, edges: selectedEdges }) => {
+          onSelectedNodeIdChange(selected[0]?.id ?? null)
+          onSelectionTargetsChange([
+            ...selected.map((node) => ({ kind: 'node' as const, id: node.id })),
+            ...selectedEdges.map((edge) => ({ kind: 'edge' as const, id: edge.id })),
+          ])
+        }}
         onNodeDragStart={() => pushHistory()}
         onSelectionDragStart={() => pushHistory()}
         deleteKeyCode={null}

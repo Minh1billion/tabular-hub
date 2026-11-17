@@ -183,6 +183,13 @@ export const PencilIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="m14.5 7.5 3 3" />
   </Icon>
 )
+export const ShareIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" />
+    <path d="M18 8v6M15 11h6" />
+  </Icon>
+)
 export const FitIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
