@@ -2,12 +2,16 @@ import uuid
 from datetime import datetime, timezone
 
 import stripe
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.billing.models import ProcessedWebhookEvent, Subscription
 from app.billing.plans import PLAN_LIMITS, TIER_ORDER, tier_for_price
+from app.billing.schemas import SubscriptionRead
 from app.config import settings
 from app.core.exceptions import AppError
+from app.resources.models import ResourceUsage
+from app.workspace.models import Workspace
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -21,11 +25,43 @@ def get_or_create_subscription(db: Session, user_id: uuid.UUID) -> Subscription:
     db.refresh(sub)
     return sub
 
-def get_plan_limits(db: Session, user_id: uuid.UUID) -> dict:
-    sub = get_or_create_subscription(db, user_id)
+def effective_limits(sub: Subscription) -> dict:
     if sub.status not in ("active", "trialing"):
         return PLAN_LIMITS["free"]
     return PLAN_LIMITS.get(sub.tier, PLAN_LIMITS["free"])
+
+def get_plan_limits(db: Session, user_id: uuid.UUID) -> dict:
+    return effective_limits(get_or_create_subscription(db, user_id))
+
+def count_owned_workspaces(db: Session, owner_id: uuid.UUID) -> int:
+    return (
+        db.query(Workspace)
+        .filter(Workspace.owner_id == owner_id, Workspace.deleted_at.is_(None))
+        .count()
+    )
+
+def get_storage_used(db: Session, owner_id: uuid.UUID) -> int:
+    return (
+        db.query(func.coalesce(func.sum(ResourceUsage.size_bytes), 0))
+        .join(Workspace, Workspace.id == ResourceUsage.workspace_id)
+        .filter(Workspace.owner_id == owner_id, Workspace.deleted_at.is_(None))
+        .scalar()
+    )
+
+def get_subscription_overview(db: Session, owner_id: uuid.UUID) -> SubscriptionRead:
+    sub = get_or_create_subscription(db, owner_id)
+    limits = effective_limits(sub)
+    return SubscriptionRead(
+        tier=sub.tier,
+        status=sub.status,
+        current_period_end=sub.current_period_end,
+        cancel_at_period_end=sub.cancel_at_period_end,
+        max_workspaces=limits["max_workspaces"],
+        workspace_count=count_owned_workspaces(db, owner_id),
+        max_resource_size_bytes=limits["max_resource_size_bytes"],
+        max_total_storage_bytes=limits["max_total_storage_bytes"],
+        storage_used_bytes=get_storage_used(db, owner_id),
+    )
 
 def list_plans() -> list[dict]:
     plans = []

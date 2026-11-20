@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '@/shared/lib/api-client'
+import { apiClient, getAuthToken } from '@/shared/lib/api-client'
 import { Run, RunStreamEvent, TERMINAL_RUN_EVENTS } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -31,7 +31,12 @@ export function useRunEvents(workspaceId: string | undefined, runId: string | un
       )
       if (alreadyDone) return
 
-      const source = new EventSource(`${API_URL}/workspaces/${workspaceId}/runs/${runId}/events`, {
+      const token = getAuthToken()
+      const eventsUrl = new URL(`${API_URL}/workspaces/${workspaceId}/runs/${runId}/events`)
+      if (token) {
+        eventsUrl.searchParams.set('token', token)
+      }
+      const source = new EventSource(eventsUrl.toString(), {
         withCredentials: true,
       })
       sourceRef.current = source
