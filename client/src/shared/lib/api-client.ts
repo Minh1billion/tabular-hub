@@ -1,11 +1,41 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const TOKEN_STORAGE_KEY = 'tabular_hub_access_token'
+
+function consumeHashToken(): void {
+  if (typeof window === 'undefined') return
+  const hash = window.location.hash
+  if (!hash.startsWith('#token=')) return
+  const token = decodeURIComponent(hash.slice('#token='.length))
+  if (token) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  }
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
+consumeHashToken()
+
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY)
+}
+
+export function clearAuthToken(): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+}
 
 export class ApiError extends Error {
   status: number
+  data: Record<string, unknown> | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, data: Record<string, unknown> | null = null) {
     super(message)
     this.status = status
+    this.data = data
+  }
+
+  get code(): string | null {
+    return typeof this.data?.code === 'string' ? this.data.code : null
   }
 }
 
@@ -15,12 +45,25 @@ type RequestOptions = {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (options.body) {
+    headers['Content-Type'] = 'application/json'
+  }
+  const token = getAuthToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
-    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: options.body ? JSON.stringify(options.body) : undefined,
   })
+
+  if (path === '/auth/logout' && response.ok) {
+    clearAuthToken()
+  }
 
   if (response.status === 204) {
     return undefined as T
@@ -29,41 +72,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new ApiError(response.status, data?.detail ?? 'Something went wrong')
+    throw new ApiError(response.status, data?.detail ?? 'Something went wrong', data)
   }
 
   return data as T
-}
-
-function uploadRequest<T>(path: string, formData: FormData, onProgress?: (percent: number) => void): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${API_URL}${path}`)
-    xhr.withCredentials = true
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        onProgress(Math.round((event.loaded / event.total) * 100))
-      }
-    }
-
-    xhr.onload = () => {
-      let data: any = null
-      try {
-        data = JSON.parse(xhr.responseText)
-      } catch {
-        data = null
-      }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(data as T)
-      } else {
-        reject(new ApiError(xhr.status, data?.detail ?? 'Something went wrong'))
-      }
-    }
-
-    xhr.onerror = () => reject(new ApiError(0, 'Network error'))
-    xhr.send(formData)
-  })
 }
 
 export const apiClient = {
@@ -71,8 +83,10 @@ export const apiClient = {
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  upload: <T>(path: string, formData: FormData, onProgress?: (percent: number) => void) =>
-    uploadRequest<T>(path, formData, onProgress),
+}
+
+export function wsUrl(path: string) {
+  return `${API_URL.replace(/^http/, 'ws')}${path}`
 }
 
 export function oauthLoginUrl(provider: 'google' | 'github') {

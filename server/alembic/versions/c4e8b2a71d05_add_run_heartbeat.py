@@ -1,7 +1,7 @@
 """add run started_at and heartbeat_at
 
 Revision ID: c4e8b2a71d05
-Revises: d9dd28749a14
+Revises: c5a91e7d3b28
 Create Date: 2026-10-17 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = 'c4e8b2a71d05'
-down_revision = 'd9dd28749a14'
+down_revision = 'c5a91e7d3b28'
 branch_labels = None
 depends_on = None
 

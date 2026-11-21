@@ -53,11 +53,38 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     RUN_QUEUE_STREAM: str = "runs:pending"
 
+    COLLAB_PRESENCE_TTL_SECONDS: int = 30
+    COLLAB_HEARTBEAT_SECONDS: int = 10
+    COLLAB_LOCK_TTL_SECONDS: int = 30
+    COLLAB_SYNC_INTERVAL_SECONDS: float = 5.0
+    COLLAB_ACCESS_RECHECK_SECONDS: float = 15.0
+    COLLAB_MAX_LOCKS_PER_CONNECTION: int = 200
+
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     STRIPE_PUBLISHABLE_KEY: str
     STRIPE_PRICE_ID_PRO: str
     STRIPE_PRICE_ID_TEAM: str
 
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str | None = None
+    SMTP_FROM_NAME: str = "Tabular Hub"
+    SMTP_USE_STARTTLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 10
+
+    INVITATION_TTL_DAYS: int = 7
+
 
 settings = Settings()
+
+def allowed_origins() -> list[str]:
+    return list({
+        settings.FRONTEND_URL,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    })

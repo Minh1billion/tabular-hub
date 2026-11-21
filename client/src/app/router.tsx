@@ -1,29 +1,25 @@
-import { createBrowserRouter } from 'react-router-dom'
-import { AuthLayout } from './layouts/AuthLayout'
+import { createBrowserRouter, useParams } from 'react-router-dom'
 import { AppLayout } from './layouts/AppLayout'
-import { LoginPage } from '@/modules/auth/pages/LoginPage'
-import { WorkspaceListPage } from '@/modules/workspace/pages/WorkspaceListPage'
 import { EditorPage } from '@/modules/editor/pages/EditorPage'
-import { RunHistoryPage } from '@/modules/runs/pages/RunHistoryPage'
 import { BillingPage } from '@/modules/billing/pages/BillingPage'
 import { HomePage } from './pages/HomePage'
+import { AppIndexPage } from './pages/AppIndexPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
+function EditorRoute() {
+  const { id } = useParams<{ id: string }>()
+  return <EditorPage key={id} />
+}
+
 export const router = createBrowserRouter([
-  {
-    element: <AuthLayout />,
-    children: [{ path: '/login', element: <LoginPage /> }],
-  },
+  { path: '/', element: <HomePage /> },
   {
     element: <AppLayout />,
     children: [
-      { path: '/', element: <HomePage /> },
-      { path: '/workspaces', element: <WorkspaceListPage /> },
-      { path: '/workspaces/:id', element: <EditorPage /> },
-      { path: '/workspaces/:workspaceId/runs', element: <RunHistoryPage /> },
-      { path: '/workspaces/:workspaceId/runs/:runId', element: <RunHistoryPage /> },
+      { path: '/app', element: <AppIndexPage /> },
+      { path: '/app/:id', element: <EditorRoute /> },
       { path: '/billing', element: <BillingPage /> },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
+  { path: '*', element: <NotFoundPage /> },
 ])

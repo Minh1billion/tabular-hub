@@ -1,2 +1,7 @@
 # Environments
 .env
+.agents
+.tm
+skills-lock.json
+client/vite.config.js
+client/vite.config.d.ts

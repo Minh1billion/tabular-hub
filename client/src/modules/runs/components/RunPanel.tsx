@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Badge } from '@/shared/components/ui/Badge'
 import { Button } from '@/shared/components/ui/Button'
 import { ApiError } from '@/shared/lib/api-client'
 import { useRunEvents } from '../hooks-events'
 import { TERMINAL_RUN_EVENTS } from '../types'
 import { resourcesQueryKey } from '@/modules/resources/hooks'
 import { useCancelRun } from '../hooks'
-import { RunEventTimeline, RUN_BADGE_TONE } from './RunEventTimeline'
+import { RunBadge } from './RunBadge'
+import { RunEventTimeline } from './RunEventTimeline'
 
 interface RunPanelProps {
   workspaceId: string
@@ -40,25 +40,18 @@ export function RunPanel({ workspaceId, runId, initialStatus }: RunPanelProps) {
   const canCancel = status === 'queued' || status === 'running'
 
   return (
-    <div className="p-3 flex flex-col gap-3 text-sm">
-      <div className="flex items-center gap-2">
-        <Badge tone={RUN_BADGE_TONE[status] ?? 'pending'}>{status}</Badge>
+    <div className="rp">
+      <div className="rp-head">
+        <RunBadge status={status} />
+        <span className="font-mono text-[11px] text-muted">{runId.slice(0, 8)}</span>
         {canCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={cancelRun.isPending}
-            onClick={() => cancelRun.mutate(runId, { onSuccess: (run) => setStatus(run.status) })}
-          >
-            Cancel
+          <Button type="button" variant="danger" size="sm" loading={cancelRun.isPending} onClick={() => cancelRun.mutate(runId, { onSuccess: (run) => setStatus(run.status) })}>
+            Cancel run
           </Button>
         )}
         {cancelRun.isError && (
-          <span className="text-[12px] text-warn">
-            {cancelRun.error instanceof ApiError && cancelRun.error.status === 409
-              ? 'Run already finished, cannot cancel'
-              : cancelRun.error.message}
+          <span className="rp-err">
+            {cancelRun.error instanceof ApiError && cancelRun.error.status === 409 ? 'Run already finished, cannot cancel' : cancelRun.error.message}
           </span>
         )}
       </div>

@@ -11,8 +11,13 @@ from app.core.exceptions import AppError
 from app.core.security import create_access_token
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.workspace import service as workspace_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+def _cookie_samesite() -> str:
+    return "none" if settings.COOKIE_SECURE else "lax"
+
 
 def _set_auth_cookie(response: RedirectResponse, token: str) -> None:
     response.set_cookie(
@@ -20,7 +25,7 @@ def _set_auth_cookie(response: RedirectResponse, token: str) -> None:
         value=token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        samesite=_cookie_samesite(),
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -47,15 +52,19 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         display_name = userinfo.get("name")
         avatar_url = userinfo.get("picture")
         provider_user_id = userinfo["sub"]
+        email_verified = bool(userinfo.get("email_verified"))
     else:
         profile_resp = await client.get("user", token=token)
         profile = profile_resp.json()
         email = profile.get("email")
+        email_verified = bool(email)
         if not email:
             emails_resp = await client.get("user/emails", token=token)
             emails = emails_resp.json()
             primary = next((e for e in emails if e.get("primary")), None)
-            email = (primary or (emails[0] if emails else {})).get("email")
+            chosen = primary or (emails[0] if emails else {})
+            email = chosen.get("email")
+            email_verified = bool(chosen.get("verified"))
         if not email:
             raise AppError("GitHub account has no accessible email")
         display_name = profile.get("name") or profile.get("login")
@@ -72,14 +81,23 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         access_token=token.get("access_token"),
     )
 
+    if email_verified:
+        workspace_service.accept_pending_invitations(db, user=user, email=email)
+
     access_token = create_access_token(str(user.id))
-    response = RedirectResponse(url=settings.FRONTEND_URL)
+    frontend_base = settings.FRONTEND_URL.rstrip("/")
+    response = RedirectResponse(url=f"{frontend_base}/#token={access_token}")
     _set_auth_cookie(response, access_token)
     return response
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(response: Response):
-    response.delete_cookie("access_token")
+    response.delete_cookie(
+        "access_token",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=_cookie_samesite(),
+    )
 
 @router.get("/me", response_model=UserRead)
 async def me(current_user: User = Depends(get_current_user)):

@@ -5,7 +5,7 @@ TIER_ORDER = ["free", "pro", "team"]
 PLAN_LIMITS = {
     "free": {
         "stripe_price_id": None,
-        "max_workspaces": 1,
+        "max_workspaces": 3,
         "max_resource_size_bytes": 50 * 1024 * 1024,
         "max_total_storage_bytes": 500 * 1024 * 1024,
     },

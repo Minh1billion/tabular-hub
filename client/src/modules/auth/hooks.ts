@@ -4,12 +4,12 @@ import { getMe, logout } from './api'
 
 export const authQueryKey = ['auth', 'me'] as const
 
-export function useCurrentUser() {
+export function useCurrentUser(options?: { silent?: boolean }) {
   return useQuery({
     queryKey: authQueryKey,
     queryFn: getMe,
     retry: false,
-    throwOnError: (error) => !(error instanceof ApiError && error.status === 401),
+    throwOnError: options?.silent ? false : (error) => !(error instanceof ApiError && error.status === 401),
   })
 }
 

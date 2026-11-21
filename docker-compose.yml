@@ -77,12 +77,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
+      - tm_storage:/code/.tm
       - ./server/app:/code/app
+      - ./server/alembic:/code/alembic
 
   worker:
     build: ./server
@@ -100,7 +100,9 @@ services:
       minio:
         condition: service_healthy
     volumes:
+      - tm_storage:/code/.tm
       - ./server/app:/code/app
+      - ./server/alembic:/code/alembic
 
   client:
     build: ./client
@@ -121,3 +123,4 @@ volumes:
   db_data:
   redis_data:
   minio_data:
+  tm_storage:

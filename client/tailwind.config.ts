@@ -5,8 +5,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        cream: 'var(--cream)',
-        'cream-soft': 'var(--cream-soft)',
+        bg: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
         white: 'var(--white)',
         line: 'var(--line)',
         ink: 'var(--ink)',
@@ -18,6 +19,8 @@ export default {
         'brand-tint': 'var(--brand-tint)',
         warn: 'var(--warn)',
         'warn-tint': 'var(--warn-tint)',
+        'brand-tint-2': 'var(--brand-tint-2)',
+        'line-2': 'var(--line-2)',
         'accent-clay': 'var(--accent-clay)',
         'accent-gold': 'var(--accent-gold)',
         'accent-teal': 'var(--accent-teal)',
@@ -25,8 +28,8 @@ export default {
         'accent-olive': 'var(--accent-olive)',
       },
       fontFamily: {
-        headline: ['"IBM Plex Sans"', 'sans-serif'],
-        body: ['"IBM Plex Sans"', 'sans-serif'],
+        headline: ['"Be Vietnam Pro"', '"IBM Plex Sans"', 'sans-serif'],
+        body: ['"Be Vietnam Pro"', '"IBM Plex Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       borderRadius: {

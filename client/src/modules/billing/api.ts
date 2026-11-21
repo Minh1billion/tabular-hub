@@ -9,6 +9,10 @@ export function getSubscription() {
   return apiClient.get<Subscription>('/billing/subscription')
 }
 
+export function getWorkspaceSubscription(workspaceId: string) {
+  return apiClient.get<Subscription>(`/billing/workspaces/${workspaceId}/subscription`)
+}
+
 export function createCheckoutSession(tier: PlanTier) {
   return apiClient.post<{ url: string }>('/billing/checkout-session', { tier })
 }

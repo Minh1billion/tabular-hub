@@ -1,33 +1,55 @@
-import { useEffect, useState } from 'react'
+import { CSSProperties, useEffect, useState } from 'react'
 import { Handle, NodeProps, Position } from '@xyflow/react'
 import { cn } from '@/shared/lib/cn'
+import { Avatar } from '@/shared/components/ui/Avatar'
+import { LockHolder } from '@/modules/collab/types'
 import { NodeDescriptor } from '@/modules/editor/types'
+import { NodeIcon, PencilIcon, TrashIcon } from '../nodes/icons'
+import { NodeTip, countMissingParams, useHoverRect } from './NodeTip'
+
+export const NODE_DELETE_EVENT = 'canvas-node-delete'
 
 export interface PipelineNodeData {
   label: string
   nodeType: string
+  category?: string
   params: Record<string, unknown>
   descriptor?: NodeDescriptor
   hasError?: boolean
+  errorMessages?: string[]
+  highlighted?: boolean
+  lockedBy?: LockHolder | null
   onRename?: (name: string) => void
   renameSignal?: number
   [key: string]: unknown
 }
 
-const handleClasses = '!w-2.5 !h-2.5 !border-2 !border-white !bg-muted hover:!bg-brand transition-colors'
-
-export function PipelineNode({ data, selected }: NodeProps) {
-  const { label, nodeType, descriptor, hasError, onRename, renameSignal } = data as PipelineNodeData
+export function PipelineNode({ id, data, selected, dragging }: NodeProps) {
+  const nodeData = data as PipelineNodeData
+  const { label, nodeType, category = 'Transform', params, descriptor, hasError, errorMessages, highlighted, lockedBy, onRename, renameSignal } = nodeData
+  const locked = Boolean(lockedBy)
+  const { rect, show, hide } = useHoverRect()
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(label)
 
   useEffect(() => {
-    if (renameSignal) {
+    if (dragging) hide()
+  }, [dragging, hide])
+
+  useEffect(() => {
+    if (renameSignal && !locked) {
       setDraft(label)
       setIsEditing(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renameSignal])
+
+  function startEditing() {
+    if (locked) return
+    hide()
+    setDraft(label)
+    setIsEditing(true)
+  }
 
   function submitRename() {
     const trimmed = draft.trim()
@@ -36,88 +58,104 @@ export function PipelineNode({ data, selected }: NodeProps) {
     else setDraft(label)
   }
 
+  function requestDelete() {
+    if (locked) return
+    hide()
+    window.dispatchEvent(new CustomEvent<string>(NODE_DELETE_EVENT, { detail: id }))
+  }
+
   const inPorts = descriptor?.fan_in ? descriptor.in_ports ?? [] : []
   const outPorts = descriptor && descriptor.ports_out.length > 1 ? descriptor.ports_out : []
+  const needsSetup = !hasError && countMissingParams(descriptor, params) > 0
 
   return (
     <div
-      className={cn(
-        'relative w-[200px] bg-white border-2 rounded-card px-3.5 py-3 transition-colors',
-        hasError
-          ? 'border-warn shadow-[0_0_0_1.5px_var(--warn)]'
-          : selected
-            ? 'border-brand shadow-[0_0_0_1.5px_var(--brand)]'
-            : 'border-black',
-      )}
+      className={cn('nx', selected && 'selected', hasError && 'error', needsSetup && 'setup', highlighted && 'hl', locked && 'locked')}
+      style={lockedBy ? ({ '--lock': lockedBy.color } as CSSProperties) : undefined}
+      data-cat={category}
+      onPointerEnter={(event) => !dragging && show(event.currentTarget)}
+      onPointerLeave={hide}
     >
-      {inPorts.length === 2 ? (
-        <>
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={inPorts[0]}
-            style={{ top: '32%' }}
-            className={handleClasses}
-          />
-          <span className="absolute -left-1 top-[22%] font-mono text-[8px] text-muted -translate-x-full pr-1">
-            {inPorts[0]}
-          </span>
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={inPorts[1]}
-            style={{ top: '68%' }}
-            className={handleClasses}
-          />
-          <span className="absolute -left-1 top-[58%] font-mono text-[8px] text-muted -translate-x-full pr-1">
-            {inPorts[1]}
-          </span>
-        </>
-      ) : (
-        <Handle type="target" position={Position.Left} className={handleClasses} />
-      )}
+      <div className="nx-tile">
+        {inPorts.length === 2 ? (
+          <>
+            <Handle type="target" position={Position.Left} id={inPorts[0]} style={{ top: '30%' }} className="nx-handle" />
+            <Handle type="target" position={Position.Left} id={inPorts[1]} style={{ top: '70%' }} className="nx-handle" />
+          </>
+        ) : (
+          <Handle type="target" position={Position.Left} className="nx-handle" />
+        )}
 
-      <div className="font-mono text-[10px] tracking-wide text-muted mb-1 uppercase truncate">{nodeType}</div>
-      {isEditing ? (
-        <input
-          autoFocus
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={submitRename}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') submitRename()
-            if (event.key === 'Escape') {
-              setDraft(label)
-              setIsEditing(false)
-            }
-          }}
-          className="nodrag nopan w-full text-[13.5px] font-medium text-ink bg-transparent outline-none border-b border-brand"
-        />
-      ) : (
-        <div
-          className="text-[13.5px] font-medium text-ink truncate cursor-text hover:text-brand hover:underline transition-colors"
-          onDoubleClick={(event) => {
-            event.stopPropagation()
-            setIsEditing(true)
-          }}
-        >
-          {label}
-        </div>
-      )}
+        <NodeIcon type={nodeType} category={category} className="nx-icon" />
 
-      {outPorts.length > 0 ? (
-        outPorts.map((port, index) => (
-          <Handle
-            key={port}
-            type="source"
-            position={Position.Right}
-            id={port}
-            style={{ top: `${((index + 1) / (outPorts.length + 1)) * 100}%` }}
-            className={handleClasses}
+        {hasError && <span className="nx-badge err">!</span>}
+        {needsSetup && <span className="nx-badge warn">!</span>}
+
+        {lockedBy && (
+          <div className="nx-lock" title={`Being edited by ${lockedBy.name}`}>
+            <Avatar name={lockedBy.name} imageUrl={lockedBy.avatarUrl} size={16} />
+            <span>{lockedBy.name}</span>
+          </div>
+        )}
+
+        {!isEditing && !locked && (
+          <div className="nx-bar nodrag nopan" onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" aria-label="Rename node" onClick={startEditing}>
+              <PencilIcon />
+            </button>
+            <button type="button" className="danger" aria-label="Delete node" onClick={requestDelete}>
+              <TrashIcon />
+            </button>
+          </div>
+        )}
+
+        {outPorts.length > 0 ? (
+          outPorts.map((port, index) => (
+            <Handle
+              key={port}
+              type="source"
+              position={Position.Right}
+              id={port}
+              style={{ top: `${((index + 1) / (outPorts.length + 1)) * 100}%` }}
+              className="nx-handle"
+            />
+          ))
+        ) : (
+          <Handle type="source" position={Position.Right} className="nx-handle" />
+        )}
+      </div>
+
+      <div className="nx-label">
+        {isEditing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={submitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitRename()
+              if (e.key === 'Escape') {
+                setDraft(label)
+                setIsEditing(false)
+              }
+            }}
+            className="nodrag nopan"
           />
-        ))
-      ) : (
-        <Handle type="source" position={Position.Right} className={handleClasses} />
+        ) : (
+          <span
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              startEditing()
+            }}
+          >
+            {label}
+          </span>
+        )}
+      </div>
+      <small className="nx-type">{nodeType}</small>
+
+      {rect && !isEditing && !dragging && (
+        <NodeTip rect={rect} label={label} nodeType={nodeType} category={category} descriptor={descriptor} params={params} hasError={hasError} errorMessages={errorMessages} />
       )}
     </div>
   )

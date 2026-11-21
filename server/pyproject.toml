@@ -18,19 +18,8 @@ dependencies = [
     "python-multipart",
     "boto3",
     "stripe",
-    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@7db29cb",
+    "tabular-manner @ git+https://github.com/Minh1billion/tabular-manner.git@b4c5633",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest",
-    "pytest-asyncio",
-    "fakeredis",
-]
-
-[tool.pytest.ini_options]
-addopts = "--import-mode=importlib"
-asyncio_mode = "auto"
 
 [build-system]
 requires = ["hatchling"]

@@ -23,6 +23,14 @@ def execute_events(
 
     engine = lifecycle.engine
     if kind == "import":
+        if staging.is_local():
+            return engine.data_resource.import_source(
+                key=spec["key"],
+                source_kind="file",
+                source_params={"format": spec["format"], "path": str(staging.local_path(spec["staging_key"]))},
+                bucket=bucket,
+                overwrite=spec["overwrite"],
+            )
         return engine.data_resource.import_source(
             key=spec["key"],
             source_kind="s3",
@@ -31,6 +39,14 @@ def execute_events(
             overwrite=spec["overwrite"],
         )
     if kind == "export":
+        if staging.is_local():
+            return engine.data_resource.export(
+                key=spec["key"],
+                writer_kind="file",
+                writer_params={"path": str(staging.local_path(spec["staging_key"]))},
+                format=spec["format"],
+                bucket=bucket,
+            )
         return engine.data_resource.export(
             key=spec["key"],
             writer_kind="s3",

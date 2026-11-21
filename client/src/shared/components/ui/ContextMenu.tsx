@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { createPortal } from 'react-dom'
 
 interface ContextMenuItem {
   label: string
@@ -18,38 +18,44 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function handleOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) onClose()
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
-    document.addEventListener('mousedown', handleOutside)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
     }
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       style={{ top: y, left: x }}
-      className="fixed z-50 min-w-[170px] bg-white border border-line rounded-lg py-1 shadow-lg"
+      className="menu-pop"
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
     >
       {items.map((item) => (
         <button
           key={item.label}
           type="button"
-          onClick={(event) => {
-            event.stopPropagation()
+          className={item.destructive ? 'destructive' : undefined}
+          onClick={(e) => {
+            e.stopPropagation()
             item.onClick()
             onClose()
           }}
-          className={cn(
-            'w-full text-left px-3 py-1.5 text-[13px] hover:bg-cream-soft transition-colors',
-            item.destructive ? 'text-warn' : 'text-ink',
-          )}
         >
           {item.label}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body,
   )
 }

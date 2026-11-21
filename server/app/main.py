@@ -5,10 +5,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.auth.router import router as auth_router
 from app.billing.router import router as billing_router
 from app.nodes.router import router as nodes_router
-from app.resources.router import router as resources_router
+from app.resources.router import router as resources_router, staging_router
+from app.collab.router import router as collab_router
 from app.run.router import router as run_router
 from app.workspace.router import router as workspace_router
-from app.config import settings
+from app.config import allowed_origins, settings
 from app.core.engine import engine_lifespan
 from app.core.exceptions import register_exception_handlers
 
@@ -16,16 +17,9 @@ app = FastAPI(title="Tabular Manner App", lifespan=engine_lifespan)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
-_allowed_origins = list({
-    settings.FRONTEND_URL,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-})
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
+    allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,9 +30,11 @@ register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(billing_router)
 app.include_router(workspace_router)
+app.include_router(collab_router)
 app.include_router(run_router)
 app.include_router(nodes_router)
 app.include_router(resources_router)
+app.include_router(staging_router)
 
 @app.get("/health")
 def health():
